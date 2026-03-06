@@ -9,6 +9,7 @@ This project is intentionally separate from [Mujina](https://github.com/256found
 ## Binaries
 
 - `apw12-psu-tool` — APW12 PSU control and telemetry
+- `controlboard-misc` — misc GPIO helpers for control-board LEDs
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
 - `hashboard_s19jpro` — direct serial and GPIO sanity checks for the three connected S19j Pro hashboards
 
@@ -61,6 +62,23 @@ project.
 - includes a `prepare-board` helper that drives PSU enable GPIO `437` high via sysfs
 
 Shared code lives in the library crate under `src/lib.rs`, with each executable in `src/bin/`.
+
+## Current controlboard-misc scope
+
+- controls the two misc control-board LEDs via sysfs GPIO
+- uses green LED GPIO `453`
+- uses red LED GPIO `438`
+- supports these commands:
+  - `controlboard-misc status`
+  - `controlboard-misc set <green|red|all> <on|off|high|low|1|0>`
+  - `controlboard-misc toggle [green|red|all]`
+
+Example:
+
+- `/home/root/controlboard-misc status`
+- `/home/root/controlboard-misc set green on`
+- `/home/root/controlboard-misc toggle red`
+- `/home/root/controlboard-misc toggle all`
 
 ## Current fan-tool scope
 
@@ -199,6 +217,7 @@ Example:
 Build one binary explicitly:
 
 - `cargo build --release --target aarch64-unknown-linux-musl --bin apw12-psu-tool`
+- `cargo build --release --target aarch64-unknown-linux-musl --bin controlboard-misc`
 - `cargo build --release --target aarch64-unknown-linux-musl --bin fan-tool`
 - `cargo build --release --target aarch64-unknown-linux-musl --bin hashboard_s19jpro`
 
@@ -207,12 +226,14 @@ Build one binary explicitly:
 Example copy target:
 
 - `/home/root/apw12-psu-tool`
+- `/home/root/controlboard-misc`
 - `/home/root/fan-tool`
 - `/home/root/hashboard_s19jpro`
 
 The corresponding compiled binaries will appear under:
 
 - `target/<triple>/release/apw12-psu-tool`
+- `target/<triple>/release/controlboard-misc`
 - `target/<triple>/release/fan-tool`
 - `target/<triple>/release/hashboard_s19jpro`
 
