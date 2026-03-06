@@ -30,7 +30,7 @@ Usage:
 
 Example:
 
-- `./disable_luxminer.exp 192.168.1.236`
+- `./disable_luxminer.exp <controlboard_ip>`
 
 What it does:
 
@@ -221,7 +221,43 @@ Build one binary explicitly:
 - `cargo build --release --target aarch64-unknown-linux-musl --bin fan-tool`
 - `cargo build --release --target aarch64-unknown-linux-musl --bin hashboard_s19jpro`
 
+The resulting binaries on the local build machine will appear under:
+
+- `target/aarch64-unknown-linux-musl/release/apw12-psu-tool`
+- `target/aarch64-unknown-linux-musl/release/controlboard-misc`
+- `target/aarch64-unknown-linux-musl/release/fan-tool`
+- `target/aarch64-unknown-linux-musl/release/hashboard_s19jpro`
+
 ## Deploy
+
+The Amlogic control board OS exposes SSH, but it does not provide an SFTP
+server. That means modern `scp` defaults may fail unless legacy SCP protocol is
+forced explicitly.
+
+Typical board details:
+
+- IP: `<controlboard_ip>`
+- user: `root`
+- password: `root`
+
+Recommended deployment flow:
+
+1. Build the target binary for the board:
+  - `cargo build --release --target aarch64-unknown-linux-musl --bin controlboard-misc`
+2. Copy it with legacy SCP mode enabled:
+  - `scp -O target/aarch64-unknown-linux-musl/release/controlboard-misc root@<controlboard_ip>:/home/root/controlboard-misc`
+3. Log in over SSH:
+  - `ssh root@<controlboard_ip>`
+4. Mark it executable if needed:
+  - `chmod +x /home/root/controlboard-misc`
+5. Run it directly on the board:
+  - `/home/root/controlboard-misc status`
+
+If `scp` is attempted without `-O`, OpenSSH may try to use SFTP and fail with
+an error similar to:
+
+- `sh: line 1: /usr/libexec/sftp-server: No such file or directory`
+- `scp: Connection closed`
 
 Example copy target:
 
@@ -229,13 +265,6 @@ Example copy target:
 - `/home/root/controlboard-misc`
 - `/home/root/fan-tool`
 - `/home/root/hashboard_s19jpro`
-
-The corresponding compiled binaries will appear under:
-
-- `target/<triple>/release/apw12-psu-tool`
-- `target/<triple>/release/controlboard-misc`
-- `target/<triple>/release/fan-tool`
-- `target/<triple>/release/hashboard_s19jpro`
 
 ## Safety notes
 
