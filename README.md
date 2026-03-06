@@ -1,17 +1,17 @@
 # amlogic control-board tools
 
-Standalone Rust utilities for talking directly to hardware on an Amlogic-based S19j Pro control board.
+Standalone Rust utilities for talking directly to hardware on an Amlogic A113D based Antminer control board that has been previously flashed with LuxOS. The LuxOS miner application needs to be disabled before running these tools.
 
 ## Purpose
 
-This project is intentionally separate from `mujina-test`. It is meant to host small standalone binaries that can be deployed onto a live control board so hardware behavior can be validated independently before integrating support into Mujina.
+This project is intentionally separate from [Mujina](https://github.com/256foundation/mujina/). It is meant to host small standalone binaries that can be deployed onto a live control board so hardware behavior can be validated independently before integrating support into Mujina.
 
 ## Binaries
 
 - `apw12-psu-tool` — APW12 PSU control and telemetry
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
 
-## Current APW12 scope
+## Current apw12-psu-tool scope
 
 - opens the dedicated PSU bus at `/dev/i2c-1`
 - defaults to the live LuxOS-facing transport at address `0x10`
@@ -119,3 +119,7 @@ project.
 - Voltage changes should be followed by a short settling delay before measurement.
 - Fan speed changes should also be followed by a short settling delay before reading RPM.
 - `fan-tool` currently assumes 2 tach pulses per revolution and two shared PWM channels for four fans.
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 (GPLv3).
