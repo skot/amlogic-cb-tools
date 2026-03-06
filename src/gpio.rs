@@ -29,6 +29,18 @@ impl SysfsGpio {
         Ok(())
     }
 
+    pub fn set_input(&self) -> Result<(), std::io::Error> {
+        self.ensure_exported()?;
+        fs::write(self.root.join("direction"), "in")?;
+        Ok(())
+    }
+
+    pub fn read_value(&self) -> Result<u8, std::io::Error> {
+        self.ensure_exported()?;
+        let value = fs::read_to_string(self.root.join("value"))?;
+        Ok(if value.trim() == "0" { 0 } else { 1 })
+    }
+
     fn ensure_exported(&self) -> Result<(), std::io::Error> {
         if self.root.exists() {
             return Ok(());

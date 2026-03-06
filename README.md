@@ -10,6 +10,39 @@ This project is intentionally separate from [Mujina](https://github.com/256found
 
 - `apw12-psu-tool` — APW12 PSU control and telemetry
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
+- `hashboard_s19jpro` — direct serial and GPIO sanity checks for the three connected S19j Pro hashboards
+
+## Disable LuxOS mining tools first
+
+Before running the tools on a live LuxOS control board, disable `luxminer` and
+`luxupdate` so they do not interfere with PSU control, fan control, or other
+hardware access.
+
+This project includes a helper script:
+
+- [disable_luxminer.exp](disable_luxminer.exp)
+
+Usage:
+
+- `chmod +x disable_luxminer.exp`
+- `./disable_luxminer.exp <board-ip>`
+
+Example:
+
+- `./disable_luxminer.exp 192.168.1.236`
+
+What it does:
+
+- kills any running `luxminer` / `luxupdate` processes
+- replaces `/luxminer` and `/luxupdate` with inert symlinks to `/bin/false`
+- preserves the original binaries as backup files
+- replaces the LuxOS init script with a no-op stub
+- disables the LuxOS runlevel startup links
+
+The original LuxOS binaries are preserved and not deleted.
+
+After disabling LuxOS mining tools, deploy and run the binaries from this
+project.
 
 ## Current apw12-psu-tool scope
 
@@ -53,6 +86,38 @@ Example live workflow:
 - `sleep 3`
 - `/home/root/fan-tool read-rpm all 1500`
 
+## Current hashboard_s19jpro scope
+
+- targets the three fixed Amlogic UARTs:
+  - `/dev/ttyS1`
+  - `/dev/ttyS2`
+  - `/dev/ttyS3`
+- uses reset GPIOs `454`, `455`, `456`
+- reads hashboard detect GPIOs `439`, `440`, `441`
+- toggles reset, sends the known BM1362 init frame, then sends the simple ping frame
+- buffers UART data by reply frame boundary
+- prints one complete 11-byte ASIC reply per line as hexadecimal
+- counts total replies and unique reply patterns cleanly
+
+Current live behavior on the connected S19j Pro hashboards:
+
+- all three hashboards report present on their detect GPIOs
+- each board currently returns the repeated 11-byte reply:
+  - `AA 55 13 62 03 00 00 00 00 00 1E`
+- each board produced `126` framed replies during the current ping test
+- each board produced `1` unique reply pattern during that test
+
+Example:
+
+- `/home/root/hashboard_s19jpro check`
+- `/home/root/hashboard_s19jpro check 0`
+
+Example summary output:
+
+- `response_count=126`
+- `unique_reply_count=1`
+- `unique_reply 01: count=126 data=AA 55 13 62 03 00 00 00 00 00 1E`
+
 ## Build
 
 Recommended target:
@@ -67,6 +132,7 @@ Build one binary explicitly:
 
 - `cargo build --release --target aarch64-unknown-linux-musl --bin apw12-psu-tool`
 - `cargo build --release --target aarch64-unknown-linux-musl --bin fan-tool`
+- `cargo build --release --target aarch64-unknown-linux-musl --bin hashboard_s19jpro`
 
 ## Deploy
 
@@ -74,43 +140,13 @@ Example copy target:
 
 - `/home/root/apw12-psu-tool`
 - `/home/root/fan-tool`
+- `/home/root/hashboard_s19jpro`
 
 The corresponding compiled binaries will appear under:
 
 - `target/<triple>/release/apw12-psu-tool`
 - `target/<triple>/release/fan-tool`
-
-## Disable LuxOS mining tools first
-
-Before running the tools on a live LuxOS control board, disable `luxminer` and
-`luxupdate` so they do not interfere with PSU control, fan control, or other
-hardware access.
-
-This project includes a helper script:
-
-- [disable_luxminer.exp](disable_luxminer.exp)
-
-Usage:
-
-- `chmod +x disable_luxminer.exp`
-- `./disable_luxminer.exp <board-ip>`
-
-Example:
-
-- `./disable_luxminer.exp 192.168.1.236`
-
-What it does:
-
-- kills any running `luxminer` / `luxupdate` processes
-- replaces `/luxminer` and `/luxupdate` with inert symlinks to `/bin/false`
-- preserves the original binaries as backup files
-- replaces the LuxOS init script with a no-op stub
-- disables the LuxOS runlevel startup links
-
-The original LuxOS binaries are preserved and not deleted.
-
-After disabling LuxOS mining tools, deploy and run the binaries from this
-project.
+- `target/<triple>/release/hashboard_s19jpro`
 
 ## Safety notes
 
