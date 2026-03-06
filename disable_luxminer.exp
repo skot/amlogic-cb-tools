@@ -1,0 +1,52 @@
+#!/usr/bin/expect -f
+
+if {$argc != 1} {
+	puts stderr "usage: $argv0 <ip-address>"
+	exit 2
+}
+
+set board_ip [lindex $argv 0]
+
+set timeout 90
+spawn ssh -tt -o StrictHostKeyChecking=no root@$board_ip
+expect {
+	"yes/no" {
+		send "yes\r"
+		exp_continue
+	}
+	"password:" {
+		send "root\r"
+		exp_continue
+	}
+	"# " {}
+}
+send "killall luxminer luxupdate 2>/dev/null || true\r"
+expect "# "
+send "test -e /luxminer.disabled.bin || mv /luxminer /luxminer.disabled.bin\r"
+expect "# "
+send "test -e /luxupdate.disabled.bin || mv /luxupdate /luxupdate.disabled.bin\r"
+expect "# "
+send "ln -sf /bin/false /luxminer\r"
+expect "# "
+send "ln -sf /bin/false /luxupdate\r"
+expect "# "
+send "cp -f /etc/init.d/disabled.luxminer-init /etc/init.d/luxminer-init.backup 2>/dev/null || true\r"
+expect "# "
+send "printf '#!/bin/sh\\nexit 0\\n' > /etc/init.d/luxminer-init && chmod 755 /etc/init.d/luxminer-init\r"
+expect "# "
+send "mv /etc/rc2.d/S90luxminer-init /etc/rc2.d/disabled.S90luxminer-init 2>/dev/null || true\r"
+expect "# "
+send "mv /etc/rc3.d/S90luxminer-init /etc/rc3.d/disabled.S90luxminer-init 2>/dev/null || true\r"
+expect "# "
+send "mv /etc/rc4.d/S90luxminer-init /etc/rc4.d/disabled.S90luxminer-init 2>/dev/null || true\r"
+expect "# "
+send "mv /etc/rc5.d/S90luxminer-init /etc/rc5.d/disabled.S90luxminer-init 2>/dev/null || true\r"
+expect "# "
+send "ls -l /luxminer /luxminer.disabled.bin /luxupdate /luxupdate.disabled.bin /etc/init.d/luxminer-init /etc/init.d/luxminer-init.backup 2>/dev/null\r"
+expect "# "
+send "ls -l /etc/rc2.d/*luxminer* /etc/rc3.d/*luxminer* /etc/rc4.d/*luxminer* /etc/rc5.d/*luxminer* 2>/dev/null || true\r"
+expect "# "
+send "ps | grep lux | grep -v grep || true\r"
+expect "# "
+send "exit\r"
+expect eof

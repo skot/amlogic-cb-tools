@@ -1,0 +1,9 @@
+[package]
+name = "amlogic-cb-tools"
+version = "0.1.0"
+edition = "2024"
+description = "Standalone Amlogic control-board utilities, including APW12 PSU control"
+license = "MIT"
+
+[dependencies]
+libc = "0.2"
