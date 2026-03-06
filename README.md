@@ -245,6 +245,13 @@ The corresponding compiled binaries will appear under:
 - Fan speed changes should also be followed by a short settling delay before reading RPM.
 - `fan-tool` currently assumes 2 tach pulses per revolution and two shared PWM channels for four fans.
 
+## Credits
+
+- [Mujina](https://github.com/256foundation/mujina/) for being the best
+- zbomzz for PSU protocol reverse engineering
+- [Hashsource](https://github.com/HashSource/Antminer-APW12-Firmware) for PSU firmware dumps
+- [Alex20129](https://github.com/Alex20129/eeprom_tool) for EEPROM decoding
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3).
