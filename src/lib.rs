@@ -1,3 +1,4 @@
+pub mod eeprom_antminer;
 pub mod gpio;
 pub mod linux_i2c;
 pub mod pwm;

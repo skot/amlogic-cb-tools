@@ -103,6 +103,16 @@ Example live workflow:
   - HB0: `0x4C`, `0x48`
   - HB1: `0x4D`, `0x49`
   - HB2: `0x4E`, `0x4A`
+- supports direct EEPROM reads on the same native Linux I2C bus:
+  - HB0: `0x50`
+  - HB1: `0x51`
+  - HB2: `0x52`
+- includes a native Rust port of the legacy Antminer v4 EEPROM decode path:
+  - reads version from byte `0x00`
+  - splits byte `0x01` into algorithm and key index
+  - currently supports the observed `XXTEA` decode path used by these S19j Pro boards
+  - decodes board identity and test-parameter fields directly in `hashboard_s19jpro`
+  - reports PT1/PT2 CRC values from the decoded record
 
 Current live behavior on the connected S19j Pro hashboards:
 
@@ -118,6 +128,27 @@ Current live behavior on the connected S19j Pro hashboards:
   - HB0: `39.0000 °C`, `33.3750 °C`
   - HB1: `39.1250 °C`, `33.1875 °C`
   - HB2: `41.1250 °C`, `34.3750 °C`
+- current live EEPROM observations:
+  - all three boards expose `256` bytes at `0x50`/`0x51`/`0x52`
+  - byte `0x00` is `0x04` on all three boards
+  - byte `0x01` is `0x11` on all three boards
+  - bytes `0x02..0x61` are board-specific encoded payloads
+  - bytes `0x70..0xFF` are mostly `0xFF` with a short board-specific prefix
+  - byte `0xFF` is `0x5A` on all three boards
+  - the native Rust decoder in this project successfully treats these as legacy Antminer EEPROM v4 records with algorithm/key byte `0x11`
+  - decoded fields now printed directly by `hashboard_s19jpro eeprom <board>` look plausible on all three boards:
+    - board name: `BHB42603`
+    - factory job: `KPMI20220401001`
+    - board serials: `KPMIYNRBBJDBH1985`, `KPMIYNRBBJDBI0792`, `KPMIYNRBBJDAE0701`
+    - chip markings: `P1CH22AH42`, `J1CV22AH16`, `J1C022AD1C`
+    - chip bins: `1`, `2`, `3`
+    - frequency: `525 MHz`
+    - voltage: `13.60-13.80 V`
+    - nonce rate: `9989-9998`
+    - PCB temperatures: `25-28 °C`
+    - PT1 CRC matches on all three boards
+    - PT2 CRC matches when calculated over the decoded PT2 region bytes
+  - this is a better fit than the newer EVP-style interpretation previously assumed
 
 Example:
 
@@ -126,6 +157,9 @@ Example:
 - `/home/root/hashboard_s19jpro temps 0`
 - `/home/root/hashboard_s19jpro temps 1`
 - `/home/root/hashboard_s19jpro temps 2`
+- `/home/root/hashboard_s19jpro eeprom 0`
+- `/home/root/hashboard_s19jpro eeprom 1`
+- `/home/root/hashboard_s19jpro eeprom 2`
 
 Example summary output:
 
@@ -137,6 +171,20 @@ Example temperature output:
 
 - `temp0: address=0x4C raw=27 00 temp_c=39.0000`
 - `temp1: address=0x48 raw=21 60 temp_c=33.3750`
+
+Example EEPROM output:
+
+- `board_info_version=0x04 (V4)`
+- `algorithm_and_key_version=0x11 (algorithm=XXTEA key_index=1)`
+- `board_serial=KPMIYNRBBJDBH1985`
+- `board_name=BHB42603`
+- `factory_job=KPMI20220401001`
+- `chip_marking=P1CH22AH42`
+- `voltage_v=13.80`
+- `frequency_mhz=525`
+- `nonce_rate=9989`
+- `pt1_crc=stored:0x1C calculated:0x1C match:true`
+- `pt2_crc=stored:0x15 tool_calc:0x12 region_calc:0x15`
 
 ## Build
 

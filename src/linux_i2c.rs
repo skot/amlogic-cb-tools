@@ -1,4 +1,5 @@
 use std::fs::{File, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::path::Path;
 
@@ -108,5 +109,35 @@ impl LinuxI2cDevice {
 
         let word = unsafe { data.word };
         Ok(word)
+    }
+
+    pub fn read_byte_data(&mut self, register: u8) -> Result<u8, std::io::Error> {
+        let mut data = I2cSmbusData { byte: 0 };
+        let mut args = I2cSmbusIoctlData {
+            read_write: I2C_SMBUS_READ,
+            command: register,
+            size: I2C_SMBUS_BYTE_DATA,
+            data: &mut data,
+        };
+
+        let rc = unsafe { libc::ioctl(self.file.as_raw_fd(), I2C_SMBUS as _, &mut args) };
+        if rc < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        let byte = unsafe { data.byte };
+        Ok(byte)
+    }
+
+    pub fn read_at(&mut self, register: u8, len: usize) -> Result<Vec<u8>, std::io::Error> {
+        self.file.seek(SeekFrom::Start(u64::from(register)))?;
+
+        let mut buf = vec![0u8; len];
+        self.file.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+
+    pub fn write(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
+        self.file.write_all(data)
     }
 }
