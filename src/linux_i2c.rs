@@ -8,6 +8,7 @@ const I2C_SMBUS_WRITE: u8 = 0;
 const I2C_SMBUS_READ: u8 = 1;
 const I2C_SMBUS_BYTE: u32 = 1;
 const I2C_SMBUS_BYTE_DATA: u32 = 2;
+const I2C_SMBUS_WORD_DATA: u32 = 3;
 
 #[repr(C)]
 union I2cSmbusData {
@@ -89,5 +90,23 @@ impl LinuxI2cDevice {
 
         let byte = unsafe { data.byte };
         Ok(byte)
+    }
+
+    pub fn read_word_data(&mut self, register: u8) -> Result<u16, std::io::Error> {
+        let mut data = I2cSmbusData { word: 0 };
+        let mut args = I2cSmbusIoctlData {
+            read_write: I2C_SMBUS_READ,
+            command: register,
+            size: I2C_SMBUS_WORD_DATA,
+            data: &mut data,
+        };
+
+        let rc = unsafe { libc::ioctl(self.file.as_raw_fd(), I2C_SMBUS as _, &mut args) };
+        if rc < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        let word = unsafe { data.word };
+        Ok(word)
     }
 }

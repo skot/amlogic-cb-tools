@@ -1,4 +1,5 @@
 use amlogic_cb_tools::gpio::SysfsGpio;
+use amlogic_cb_tools::linux_i2c::LinuxI2cDevice;
 use amlogic_cb_tools::serial::LinuxSerialPort;
 use std::collections::BTreeMap;
 use std::env;
@@ -8,6 +9,8 @@ use std::time::Duration;
 const INIT_FRAME: [u8; 11] = [0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C];
 const PING_FRAME: [u8; 7] = [0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A];
 const REPLY_PREAMBLE: [u8; 2] = [0xAA, 0x55];
+const TMP75_I2C_DEVICE: &str = "/dev/i2c-0";
+const TMP75_TEMP_REG: u8 = 0x00;
 const SERIAL_BAUD: u32 = 115_200;
 const SERIAL_TIMEOUT_MS: u32 = 250;
 const RESPONSE_SIZE: usize = 11;
@@ -31,6 +34,7 @@ enum Command {
     Help,
     CheckAll,
     CheckOne(usize),
+    Temps(usize),
 }
 
 fn main() {
@@ -49,6 +53,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Command::CheckOne(index) => check_hashboard(HASHBOARDS[index])?,
+        Command::Temps(index) => read_hashboard_temps(HASHBOARDS[index])?,
     }
     Ok(())
 }
@@ -113,6 +118,38 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+fn read_hashboard_temps(board: HashboardConfig) -> Result<(), Box<dyn std::error::Error>> {
+    println!();
+    println!("==================================================");
+    println!("Hashboard {} temperatures", board.index);
+    println!("==================================================");
+    println!("i2c_device={}", TMP75_I2C_DEVICE);
+    println!("detect_gpio={}", board.detect_gpio);
+
+    let detect = SysfsGpio::new(board.detect_gpio);
+    detect.set_input()?;
+    let present = detect.read_value()?;
+    println!("presence_detect={} ({})", present, if present == 0 { "not-present-or-low" } else { "present-or-high" });
+    if present == 0 {
+        return Err(format!("hashboard {} is not present", board.index).into());
+    }
+
+    let sensor_addresses = tmp75_addresses(board.index)?;
+    for (sensor_index, address) in sensor_addresses.iter().enumerate() {
+        let raw = read_tmp75_raw(*address)?;
+        let temp_c = decode_tmp75_celsius(raw);
+        println!(
+            "temp{}: address=0x{:02X} raw={} temp_c={:.4}",
+            sensor_index,
+            address,
+            format_hex(&raw.to_be_bytes()),
+            temp_c
+        );
+    }
+
+    Ok(())
+}
+
 fn extract_reply_frames(buffer: &mut Vec<u8>) -> Vec<Vec<u8>> {
     let mut frames = Vec::new();
 
@@ -150,6 +187,26 @@ fn find_preamble(buffer: &[u8]) -> Option<usize> {
         .position(|window| window == REPLY_PREAMBLE)
 }
 
+fn tmp75_addresses(board_index: usize) -> Result<[u8; 2], Box<dyn std::error::Error>> {
+    match board_index {
+        0 => Ok([0x4C, 0x48]),
+        1 => Ok([0x4D, 0x49]),
+        2 => Ok([0x4E, 0x4A]),
+        _ => Err(format!("invalid hashboard index: {board_index}").into()),
+    }
+}
+
+fn read_tmp75_raw(address: u8) -> Result<u16, Box<dyn std::error::Error>> {
+    let mut device = LinuxI2cDevice::open(TMP75_I2C_DEVICE, u16::from(address))?;
+    let raw = device.read_word_data(TMP75_TEMP_REG)?;
+    Ok(raw.swap_bytes())
+}
+
+fn decode_tmp75_celsius(raw: u16) -> f32 {
+    let value = i16::from_be_bytes(raw.to_be_bytes()) >> 4;
+    value as f32 * 0.0625
+}
+
 fn parse_args(args: Vec<String>) -> Result<Command, Box<dyn std::error::Error>> {
     match args.first().map(String::as_str) {
         None | Some("help") | Some("--help") | Some("-h") => Ok(Command::Help),
@@ -163,6 +220,14 @@ fn parse_args(args: Vec<String>) -> Result<Command, Box<dyn std::error::Error>> 
             } else {
                 Ok(Command::CheckAll)
             }
+        }
+        Some("temps") => {
+            let value = args.get(1).ok_or("missing hashboard index for temps")?;
+            let index: usize = value.parse()?;
+            if index >= HASHBOARDS.len() {
+                return Err(format!("invalid hashboard index: {index}").into());
+            }
+            Ok(Command::Temps(index))
         }
         Some(other) => Err(format!("unknown command: {other}").into()),
     }
@@ -181,7 +246,9 @@ fn print_help() {
     println!("  hashboard0: /dev/ttyS1, reset GPIO 454, detect GPIO 439");
     println!("  hashboard1: /dev/ttyS2, reset GPIO 455, detect GPIO 440");
     println!("  hashboard2: /dev/ttyS3, reset GPIO 456, detect GPIO 441");
+    println!("  tmp75 addresses: HB0=[0x4C,0x48], HB1=[0x4D,0x49], HB2=[0x4E,0x4A]");
     println!();
     println!("Commands:");
     println!("  check [0|1|2]   Reset and ping one hashboard, or all three if omitted");
+    println!("  temps <0|1|2>   Read both TMP75 temperature sensors on one hashboard");
 }

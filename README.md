@@ -92,12 +92,17 @@ Example live workflow:
   - `/dev/ttyS1`
   - `/dev/ttyS2`
   - `/dev/ttyS3`
+- reads hashboard TMP75 sensors directly over native Linux I2C on `/dev/i2c-0`
 - uses reset GPIOs `454`, `455`, `456`
 - reads hashboard detect GPIOs `439`, `440`, `441`
 - toggles reset, sends the known BM1362 init frame, then sends the simple ping frame
 - buffers UART data by reply frame boundary
 - prints one complete 11-byte ASIC reply per line as hexadecimal
 - counts total replies and unique reply patterns cleanly
+- supports direct temperature reads from both onboard sensors on a selected hashboard:
+  - HB0: `0x4C`, `0x48`
+  - HB1: `0x4D`, `0x49`
+  - HB2: `0x4E`, `0x4A`
 
 Current live behavior on the connected S19j Pro hashboards:
 
@@ -106,17 +111,32 @@ Current live behavior on the connected S19j Pro hashboards:
   - `AA 55 13 62 03 00 00 00 00 00 1E`
 - each board produced `126` framed replies during the current ping test
 - each board produced `1` unique reply pattern during that test
+- direct native I2C scan results on the live board:
+  - `/dev/i2c-0` contains TMP75-class devices at `0x48`, `0x49`, `0x4A`, `0x4C`, `0x4D`, `0x4E`
+  - `/dev/i2c-2` did not show the hashboard temperature sensors during this test
+- current live temperature reads:
+  - HB0: `39.0000 °C`, `33.3750 °C`
+  - HB1: `39.1250 °C`, `33.1875 °C`
+  - HB2: `41.1250 °C`, `34.3750 °C`
 
 Example:
 
 - `/home/root/hashboard_s19jpro check`
 - `/home/root/hashboard_s19jpro check 0`
+- `/home/root/hashboard_s19jpro temps 0`
+- `/home/root/hashboard_s19jpro temps 1`
+- `/home/root/hashboard_s19jpro temps 2`
 
 Example summary output:
 
 - `response_count=126`
 - `unique_reply_count=1`
 - `unique_reply 01: count=126 data=AA 55 13 62 03 00 00 00 00 00 1E`
+
+Example temperature output:
+
+- `temp0: address=0x4C raw=27 00 temp_c=39.0000`
+- `temp1: address=0x48 raw=21 60 temp_c=33.3750`
 
 ## Build
 
