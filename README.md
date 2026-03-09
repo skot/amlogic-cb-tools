@@ -107,9 +107,9 @@ Example live workflow:
 ## Current hashboard_s19jpro scope
 
 - targets the three fixed Amlogic UARTs:
-  - `/dev/ttyS1`
-  - `/dev/ttyS2`
-  - `/dev/ttyS3`
+  - HB0: `/dev/ttyS1`
+  - HB1: `/dev/ttyS2`
+  - HB2: `/dev/ttyS3`
 - reads hashboard TMP75 sensors directly over native Linux I2C on `/dev/i2c-0`
 - uses reset GPIOs `454`, `455`, `456`
 - reads hashboard detect GPIOs `439`, `440`, `441`
@@ -118,13 +118,13 @@ Example live workflow:
 - prints one complete 11-byte ASIC reply per line as hexadecimal
 - counts total replies and unique reply patterns cleanly
 - supports direct temperature reads from both onboard sensors on a selected hashboard:
-  - HB0: `0x4C`, `0x48`
+  - HB0: `0x4E`, `0x4A`
   - HB1: `0x4D`, `0x49`
-  - HB2: `0x4E`, `0x4A`
+  - HB2: `0x48`, `0x4C`
 - supports direct EEPROM reads on the same native Linux I2C bus:
-  - HB0: `0x50`
+  - HB0: `0x52`
   - HB1: `0x51`
-  - HB2: `0x52`
+  - HB2: `0x50`
 - includes a native Rust port of the legacy Antminer v4 EEPROM decode path:
   - reads version from byte `0x00`
   - splits byte `0x01` into algorithm and key index
@@ -209,6 +209,10 @@ Example EEPROM output:
 Recommended target:
 
 - `aarch64-unknown-linux-musl`
+
+This repository includes a Cargo target config that uses `rust-lld` for
+`aarch64-unknown-linux-musl`, so the build commands below should work on macOS
+without setting a separate linker environment variable each time.
 
 Example:
 

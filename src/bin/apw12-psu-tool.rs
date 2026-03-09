@@ -204,6 +204,11 @@ fn run_i2c_command(
                 println!("status=accepted-by-echo");
             }
             println!("raw: {:02X?}", outcome.frame.raw);
+            println!(
+                "waiting_for_psu_to_settle={}s before returning control to the CLI...",
+                DEFAULT_SETTLE_SECONDS
+            );
+            std::thread::sleep(std::time::Duration::from_secs(DEFAULT_SETTLE_SECONDS));
         }
         Command::SetVoltage(volts) => {
             let dac = encode_voltage_to_dac(volts);
@@ -224,6 +229,10 @@ fn run_i2c_command(
                 println!("status=accepted-by-echo");
             }
             println!("raw: {:02X?}", outcome.frame.raw);
+                println!(
+                    "waiting_for_psu_to_settle={}s before measured voltage readback...",
+                    DEFAULT_SETTLE_SECONDS
+                );
             std::thread::sleep(std::time::Duration::from_secs(DEFAULT_SETTLE_SECONDS));
             match exchange(config, dev, CMD_MEASURE_VOLTAGE, &[]) {
                 Ok(verify) if verify.payload.len() >= 2 => {
