@@ -286,18 +286,18 @@ fn find_preamble(buffer: &[u8]) -> Option<usize> {
 
 fn tmp75_addresses(board_index: usize) -> Result<[u8; 2], Box<dyn std::error::Error>> {
     match board_index {
-        0 => Ok([0x4C, 0x48]),
+        0 => Ok([0x4E, 0x4A]),
         1 => Ok([0x4D, 0x49]),
-        2 => Ok([0x4E, 0x4A]),
+        2 => Ok([0x48, 0x4C]),
         _ => Err(format!("invalid hashboard index: {board_index}").into()),
     }
 }
 
 fn eeprom_address(board_index: usize) -> Result<u8, Box<dyn std::error::Error>> {
     match board_index {
-        0 => Ok(0x50),
+        0 => Ok(0x52),
         1 => Ok(0x51),
-        2 => Ok(0x52),
+        2 => Ok(0x50),
         _ => Err(format!("invalid hashboard index: {board_index}").into()),
     }
 }
