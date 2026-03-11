@@ -41,6 +41,30 @@ enum Command {
     Eeprom(usize),
 }
 
+struct ResetGuard {
+    gpio: SysfsGpio,
+}
+
+impl ResetGuard {
+    fn new(gpio: SysfsGpio) -> Self {
+        Self { gpio }
+    }
+
+    fn assert(&self) -> Result<(), std::io::Error> {
+        self.gpio.set_output_low()
+    }
+
+    fn release(&self) -> Result<(), std::io::Error> {
+        self.gpio.set_output_high()
+    }
+}
+
+impl Drop for ResetGuard {
+    fn drop(&mut self) {
+        let _ = self.gpio.set_output_low();
+    }
+}
+
 fn main() {
     if let Err(err) = run() {
         eprintln!("error: {err}");
@@ -77,11 +101,11 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
     let present = detect.read_value()?;
     println!("presence_detect={} ({})", present, if present == 0 { "not-present-or-low" } else { "present-or-high" });
 
-    let reset = SysfsGpio::new(board.reset_gpio);
+    let reset = ResetGuard::new(SysfsGpio::new(board.reset_gpio));
     println!("toggling reset...");
-    reset.set_output_low()?;
+    reset.assert()?;
     thread::sleep(Duration::from_millis(100));
-    reset.set_output_high()?;
+    reset.release()?;
     thread::sleep(Duration::from_millis(100));
 
     let mut serial = LinuxSerialPort::open(board.serial_path, SERIAL_BAUD, SERIAL_TIMEOUT_MS)?;
@@ -95,6 +119,7 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
 
     let mut rx_count = 0usize;
     let mut rx_buffer = Vec::new();
+    let mut model_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut unique_replies: BTreeMap<Vec<u8>, usize> = BTreeMap::new();
     loop {
         let chunk = serial.read_chunk(READ_CHUNK_SIZE)?;
@@ -107,6 +132,7 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
         for frame in frames {
             rx_count += 1;
             println!("response {:02}: {}", rx_count, format_hex(&frame));
+            *model_counts.entry(asic_model_name(&frame)).or_insert(0) += 1;
             *unique_replies.entry(frame).or_insert(0) += 1;
         }
     }
@@ -120,6 +146,12 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
     for (index, (frame, count)) in unique_replies.iter().enumerate() {
         println!("unique_reply {:02}: count={} data={}", index + 1, count, format_hex(frame));
     }
+    println!("detected_asic_model_count={}", model_counts.len());
+    for (index, (model, count)) in model_counts.iter().enumerate() {
+        println!("detected_asic_model {:02}: count={} model={}", index + 1, count, model);
+    }
+    println!("asserting reset...");
+    reset.assert()?;
     Ok(())
 }
 
@@ -370,6 +402,14 @@ fn parse_args(args: Vec<String>) -> Result<Command, Box<dyn std::error::Error>> 
 
 fn format_hex(data: &[u8]) -> String {
     data.iter().map(|byte| format!("{byte:02X}")).collect::<Vec<_>>().join(" ")
+}
+
+fn asic_model_name(frame: &[u8]) -> String {
+    if frame.len() < 4 {
+        return "unknown".to_string();
+    }
+
+    format!("BM{:02X}{:02X}", frame[2], frame[3])
 }
 
 fn print_help() {

@@ -166,6 +166,7 @@ Examples:
     - buffers UART data by reply frame boundary
     - prints one complete 11-byte ASIC reply per line as hexadecimal
     - counts total replies and unique reply patterns cleanly
+    - extracts the ASIC model from reply bytes 3 and 4 and summarizes detected models
   - `hashboard_s19jpro temps <0|1|2>`
     - reads both onboard TMP75 temperature sensors on the selected hashboard
   - `hashboard_s19jpro eeprom <0|1|2>`
