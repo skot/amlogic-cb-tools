@@ -69,16 +69,17 @@ control board.
   - `/sys/class/pwm/pwmchip0/pwm1`
 - current PWM assumption used by `fan-tool`: 100 kHz period (`10000` ns)
 - tachometer GPIO inputs:
-  - FAN0: `447`
-  - FAN1: `448`
-  - FAN2: `449`
-  - FAN3: `450`
+  - FAN0: `447` (`GPIOA_10`)
+  - FAN1: `448` (`GPIOA_11`)
+  - FAN2: `449` (`GPIOA_12`)
+  - FAN3: `450` (`GPIOA_13`)
 - current RPM measurement approach: Linux sysfs GPIO polling on falling edges
 
 ### Misc control-board GPIO
 
-- green LED GPIO: `453`
-- red LED GPIO: `438`
+- green LED GPIO: `453` (`GPIOA_16`)
+- red LED GPIO: `438` (`GPIOA_1`)
+- IP Report Button: `445` (`GPIOA_8`)
 
 ### Hashboard serial links
 
@@ -129,6 +130,7 @@ Shared code lives in the library crate under `src/lib.rs`, with each executable 
 ## Current controlboard-misc scope
 
 - controls the two misc control-board LEDs via sysfs GPIO
+- reports the IP report button input state via sysfs GPIO
 - supports these commands:
   - `controlboard-misc status`
   - `controlboard-misc set <green|red|all> <on|off|high|low|1|0>`

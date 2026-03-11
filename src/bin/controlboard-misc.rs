@@ -3,6 +3,7 @@ use std::env;
 
 const GREEN_LED_GPIO: u32 = 453;
 const RED_LED_GPIO: u32 = 438;
+const IP_REPORT_BUTTON_GPIO: u32 = 445;
 
 #[derive(Clone, Copy)]
 struct LedConfig {
@@ -62,6 +63,16 @@ fn show_status() -> Result<(), Box<dyn std::error::Error>> {
             if value == 0 { "low" } else { "high" }
         );
     }
+
+    let button = SysfsGpio::new(IP_REPORT_BUTTON_GPIO);
+    button.set_input()?;
+    let value = button.read_value()?;
+    println!(
+        "ip-report-button: gpio={} value={} state={}",
+        IP_REPORT_BUTTON_GPIO,
+        value,
+        if value == 0 { "pressed-or-low" } else { "released-or-high" }
+    );
     Ok(())
 }
 
@@ -157,6 +168,7 @@ fn print_help() {
     println!("GPIO map:");
     println!("  - green LED: GPIO {}", GREEN_LED_GPIO);
     println!("  - red LED:   GPIO {}", RED_LED_GPIO);
+    println!("  - IP report button: GPIO {}", IP_REPORT_BUTTON_GPIO);
     println!();
     println!("Commands:");
     println!("  help");
