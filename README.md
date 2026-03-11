@@ -107,12 +107,18 @@ Example live workflow:
 ## Current hashboard_s19jpro scope
 
 - targets the three fixed Amlogic UARTs:
-  - HB0: `/dev/ttyS1`
-  - HB1: `/dev/ttyS2`
-  - HB2: `/dev/ttyS3`
-- reads hashboard TMP75 sensors directly over native Linux I2C on `/dev/i2c-0`
-- uses reset GPIOs `454`, `455`, `456`
-- reads hashboard detect GPIOs `439`, `440`, `441`
+  - HB0: `/dev/ttyS1` on `GPIOX_8`/`GPIOX_9` (`466`/`467`, `uart_a` TX/RX)
+  - HB1: `/dev/ttyS2` on `GPIOZ_2`/`GPIOZ_3` (`413`/`414`, `uart_b` TX/RX)
+  - HB2: `/dev/ttyS3` on `GPIOAO_4`/`GPIOAO_5` (`501`/`502`, `uart_ao_b` TX/RX)
+- reads hashboard TMP75 sensors directly over native Linux I2C on `/dev/i2c-0`, using `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
+- uses these hashboard reset GPIOs:
+  - HB0: `456` (`GPIOA_19`)
+  - HB1: `455` (`GPIOA_18`)
+  - HB2: `454` (`GPIOA_17`)
+- uses these hashboard detect GPIOs:
+  - HB0: `441` (`GPIOA_4`)
+  - HB1: `440` (`GPIOA_3`)
+  - HB2: `439` (`GPIOA_2`)
 - toggles reset, sends the known BM1362 init frame, then sends the simple ping frame
 - buffers UART data by reply frame boundary
 - prints one complete 11-byte ASIC reply per line as hexadecimal
@@ -122,6 +128,7 @@ Example live workflow:
   - HB1: `0x4D`, `0x49`
   - HB2: `0x48`, `0x4C`
 - supports direct EEPROM reads on the same native Linux I2C bus:
+  - bus GPIOs: `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
   - HB0: `0x52`
   - HB1: `0x51`
   - HB2: `0x50`
@@ -166,7 +173,6 @@ Current live behavior on the connected S19j Pro hashboards:
     - PCB temperatures: `25-28 °C`
     - PT1 CRC matches on all three boards
     - PT2 CRC matches when calculated over the decoded PT2 region bytes
-  - this is a better fit than the newer EVP-style interpretation previously assumed
 
 Example:
 

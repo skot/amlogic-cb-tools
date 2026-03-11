@@ -28,9 +28,9 @@ struct HashboardConfig {
 }
 
 const HASHBOARDS: [HashboardConfig; 3] = [
-    HashboardConfig { index: 0, serial_path: "/dev/ttyS1", reset_gpio: 454, detect_gpio: 439 },
+    HashboardConfig { index: 0, serial_path: "/dev/ttyS1", reset_gpio: 456, detect_gpio: 441 },
     HashboardConfig { index: 1, serial_path: "/dev/ttyS2", reset_gpio: 455, detect_gpio: 440 },
-    HashboardConfig { index: 2, serial_path: "/dev/ttyS3", reset_gpio: 456, detect_gpio: 441 },
+    HashboardConfig { index: 2, serial_path: "/dev/ttyS3", reset_gpio: 454, detect_gpio: 439 },
 ];
 
 enum Command {
@@ -378,9 +378,9 @@ fn print_help() {
     println!("Sanity-check utility for the three S19j Pro hashboards connected to the Amlogic control board.");
     println!();
     println!("Known mappings:");
-    println!("  hashboard0: /dev/ttyS1, reset GPIO 454, detect GPIO 439");
-    println!("  hashboard1: /dev/ttyS2, reset GPIO 455, detect GPIO 440");
-    println!("  hashboard2: /dev/ttyS3, reset GPIO 456, detect GPIO 441");
+    println!("  hashboard0: /dev/ttyS1, reset GPIO 456 (GPIOA_19), detect GPIO 441 (GPIOA_4)");
+    println!("  hashboard1: /dev/ttyS2, reset GPIO 455 (GPIOA_18), detect GPIO 440 (GPIOA_3)");
+    println!("  hashboard2: /dev/ttyS3, reset GPIO 454 (GPIOA_17), detect GPIO 439 (GPIOA_2)");
     println!("  tmp75 addresses: HB0=[0x4C,0x48], HB1=[0x4D,0x49], HB2=[0x4E,0x4A]");
     println!("  eeprom addresses: HB0=0x50, HB1=0x51, HB2=0x52");
     println!();
