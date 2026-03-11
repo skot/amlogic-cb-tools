@@ -1,6 +1,8 @@
 # amlogic control-board tools
 
-Standalone Rust utilities for talking directly to hardware on an Amlogic A113D based Antminer control board that has been previously flashed with LuxOS. The LuxOS miner application needs to be disabled before running these tools.
+![Alt text](doc/amlogicA113D.png)
+
+Tools and notes for using the Amlogic A113D processor as featured on the Bitmain Antminer controlboards
 
 ## Purpose
 
@@ -13,7 +15,8 @@ This project is intentionally separate from [Mujina](https://github.com/256found
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
 - `hashboard_s19jpro` — direct serial and GPIO sanity checks for the three connected S19j Pro hashboards
 
-## Disable LuxOS mining tools first
+## LuxOS firmware base
+LuxOS makes a good base firmware for experimentation. When flashed to an Amlogic controlboard you can ssh to the controlboard with user root/root and the whole filesystem is writeable. We're not interested in running LuxOS though, so you can disable the luxminer app as follows;
 
 Before running the tools on a live LuxOS control board, disable `luxminer` and
 `luxupdate` so they do not interfere with PSU control, fan control, or other
@@ -45,12 +48,71 @@ The original LuxOS binaries are preserved and not deleted.
 After disabling LuxOS mining tools, deploy and run the binaries from this
 project.
 
+## Board connections
+
+This section centralizes the known Linux-visible interfaces on the Amlogic
+control board.
+
+### PSU control path
+
+- dedicated PSU I2C bus: `/dev/i2c-1`
+- default APW12 transport address used by this project: `0x10`
+- default outbound byte-write register used by this project: `0x11`
+- PSU enable GPIO: `437`
+- current software model: framed APW12 packets sent and received one byte per
+  I2C transaction on the dedicated PSU bus
+
+### Fan control and tach inputs
+
+- PWM control paths:
+  - `/sys/class/pwm/pwmchip0/pwm0`
+  - `/sys/class/pwm/pwmchip0/pwm1`
+- current PWM assumption used by `fan-tool`: 100 kHz period (`10000` ns)
+- tachometer GPIO inputs:
+  - FAN0: `447`
+  - FAN1: `448`
+  - FAN2: `449`
+  - FAN3: `450`
+- current RPM measurement approach: Linux sysfs GPIO polling on falling edges
+
+### Misc control-board GPIO
+
+- green LED GPIO: `453`
+- red LED GPIO: `438`
+
+### Hashboard serial links
+
+- HB0 UART: `/dev/ttyS1` on `GPIOX_8`/`GPIOX_9` (`466`/`467`, `uart_a` TX/RX)
+- HB1 UART: `/dev/ttyS2` on `GPIOZ_2`/`GPIOZ_3` (`413`/`414`, `uart_b` TX/RX)
+- HB2 UART: `/dev/ttyS3` on `GPIOAO_4`/`GPIOAO_5` (`501`/`502`, `uart_ao_b` TX/RX)
+
+### Hashboard control GPIO
+
+- reset GPIOs:
+  - HB0: `456` (`GPIOA_19`)
+  - HB1: `455` (`GPIOA_18`)
+  - HB2: `454` (`GPIOA_17`)
+- detect GPIOs:
+  - HB0: `441` (`GPIOA_4`)
+  - HB1: `440` (`GPIOA_3`)
+  - HB2: `439` (`GPIOA_2`)
+
+### Hashboard sensor and EEPROM bus
+
+- native Linux I2C bus: `/dev/i2c-0`
+- bus pins: `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
+- TMP75 temperature sensor addresses:
+  - HB0: `0x4E`, `0x4A`
+  - HB1: `0x4D`, `0x49`
+  - HB2: `0x48`, `0x4C`
+- EEPROM addresses:
+  - HB0: `0x52`
+  - HB1: `0x51`
+  - HB2: `0x50`
+
+
 ## Current apw12-psu-tool scope
 
-- opens the dedicated PSU bus at `/dev/i2c-1`
-- defaults to the live LuxOS-facing transport at address `0x10`
-- defaults to outbound byte writes via register `0x11`
-- sends and receives framed APW12 protocol packets one byte per I2C transaction
 - supports basic protocol commands such as:
   - address scanning on the dedicated PSU bus
   - firmware/hardware version
@@ -59,15 +121,14 @@ project.
   - measured voltage readback
   - state readback
   - calibration reads
-- includes a `prepare-board` helper that drives PSU enable GPIO `437` high via sysfs
+- includes a `prepare-board` helper that asserts PSU enable before talking to
+  the APW12
 
 Shared code lives in the library crate under `src/lib.rs`, with each executable in `src/bin/`.
 
 ## Current controlboard-misc scope
 
 - controls the two misc control-board LEDs via sysfs GPIO
-- uses green LED GPIO `453`
-- uses red LED GPIO `438`
 - supports these commands:
   - `controlboard-misc status`
   - `controlboard-misc set <green|red|all> <on|off|high|low|1|0>`
@@ -75,140 +136,53 @@ Shared code lives in the library crate under `src/lib.rs`, with each executable 
 
 Example:
 
-- `/home/root/controlboard-misc status`
-- `/home/root/controlboard-misc set green on`
-- `/home/root/controlboard-misc toggle red`
-- `/home/root/controlboard-misc toggle all`
+- `./controlboard-misc status`
+- `./controlboard-misc set green on`
+- `./controlboard-misc toggle red`
+- `./controlboard-misc toggle all`
 
 ## Current fan-tool scope
 
-- controls PWM channels on `/sys/class/pwm/pwmchip0/pwm0` and `pwm1`
-- assumes a 100 kHz PWM period (`10000` ns)
-- reads tachometer inputs from GPIO `447` through `450`
-- measures RPM by counting falling edges with Linux sysfs GPIO polling
+- controls the board fan PWM outputs and reads tachometer inputs
+- measures RPM by counting tach pulses over a sampling window
 - supports these commands:
   - `fan-tool get-pwm`
   - `fan-tool set-percent <percent>`
   - `fan-tool set-pwm <all|0|1> <percent>`
   - `fan-tool read-rpm [all|0|1|2|3] [window_ms]`
 
-Current assumptions were validated on the live LuxOS Amlogic control board with fans connected:
+Examples:
 
-- PWM writes to `pwmchip0/pwm0` and `pwm1` successfully change fan speed
-- tachometer GPIOs `447` through `450` report non-zero RPM when fans are connected
-- fan speed changes take a short time to settle, so RPM should be sampled after a delay
-
-Example live workflow:
-
-- `/home/root/fan-tool set-percent 15`
-- `sleep 3`
-- `/home/root/fan-tool read-rpm all 1500`
+- `./fan-tool set-percent 15`
+- `./fan-tool read-rpm all 1500`
 
 ## Current hashboard_s19jpro scope
 
-- targets the three fixed Amlogic UARTs:
-  - HB0: `/dev/ttyS1` on `GPIOX_8`/`GPIOX_9` (`466`/`467`, `uart_a` TX/RX)
-  - HB1: `/dev/ttyS2` on `GPIOZ_2`/`GPIOZ_3` (`413`/`414`, `uart_b` TX/RX)
-  - HB2: `/dev/ttyS3` on `GPIOAO_4`/`GPIOAO_5` (`501`/`502`, `uart_ao_b` TX/RX)
-- reads hashboard TMP75 sensors directly over native Linux I2C on `/dev/i2c-0`, using `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
-- uses these hashboard reset GPIOs:
-  - HB0: `456` (`GPIOA_19`)
-  - HB1: `455` (`GPIOA_18`)
-  - HB2: `454` (`GPIOA_17`)
-- uses these hashboard detect GPIOs:
-  - HB0: `441` (`GPIOA_4`)
-  - HB1: `440` (`GPIOA_3`)
-  - HB2: `439` (`GPIOA_2`)
-- toggles reset, sends the known BM1362 init frame, then sends the simple ping frame
-- buffers UART data by reply frame boundary
-- prints one complete 11-byte ASIC reply per line as hexadecimal
-- counts total replies and unique reply patterns cleanly
-- supports direct temperature reads from both onboard sensors on a selected hashboard:
-  - HB0: `0x4E`, `0x4A`
-  - HB1: `0x4D`, `0x49`
-  - HB2: `0x48`, `0x4C`
-- supports direct EEPROM reads on the same native Linux I2C bus:
-  - bus GPIOs: `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
-  - HB0: `0x52`
-  - HB1: `0x51`
-  - HB2: `0x50`
-- includes a native Rust port of the legacy Antminer v4 EEPROM decode path:
-  - reads version from byte `0x00`
-  - splits byte `0x01` into algorithm and key index
-  - currently supports the observed `XXTEA` decode path used by these S19j Pro boards
-  - decodes board identity and test-parameter fields directly in `hashboard_s19jpro`
-  - reports PT1/PT2 CRC values from the decoded record
+- supports these commands:
+  - `hashboard_s19jpro check [0|1|2]`
+    - with no index, runs the serial sanity check against all three hashboards
+    - with an index, targets one hashboard
+    - toggles reset, sends the known BM1362 init frame, then sends the simple ping frame
+    - buffers UART data by reply frame boundary
+    - prints one complete 11-byte ASIC reply per line as hexadecimal
+    - counts total replies and unique reply patterns cleanly
+  - `hashboard_s19jpro temps <0|1|2>`
+    - reads both onboard TMP75 temperature sensors on the selected hashboard
+  - `hashboard_s19jpro eeprom <0|1|2>`
+    - reads the selected hashboard EEPROM on the native Linux I2C bus
+    - includes a native Rust port of the legacy Antminer v4 EEPROM decode path:
+      - reads version from byte `0x00`
+      - splits byte `0x01` into algorithm and key index
+      - currently supports the observed `XXTEA` decode path used by these S19j Pro boards
+      - decodes board identity and test-parameter fields directly in `hashboard_s19jpro`
+      - reports PT1/PT2 CRC values from the decoded record
 
-Current live behavior on the connected S19j Pro hashboards:
+Examples:
 
-- all three hashboards report present on their detect GPIOs
-- each board currently returns the repeated 11-byte reply:
-  - `AA 55 13 62 03 00 00 00 00 00 1E`
-- each board produced `126` framed replies during the current ping test
-- each board produced `1` unique reply pattern during that test
-- direct native I2C scan results on the live board:
-  - `/dev/i2c-0` contains TMP75-class devices at `0x48`, `0x49`, `0x4A`, `0x4C`, `0x4D`, `0x4E`
-  - `/dev/i2c-2` did not show the hashboard temperature sensors during this test
-- current live temperature reads:
-  - HB0: `39.0000 °C`, `33.3750 °C`
-  - HB1: `39.1250 °C`, `33.1875 °C`
-  - HB2: `41.1250 °C`, `34.3750 °C`
-- current live EEPROM observations:
-  - all three boards expose `256` bytes at `0x50`/`0x51`/`0x52`
-  - byte `0x00` is `0x04` on all three boards
-  - byte `0x01` is `0x11` on all three boards
-  - bytes `0x02..0x61` are board-specific encoded payloads
-  - bytes `0x70..0xFF` are mostly `0xFF` with a short board-specific prefix
-  - byte `0xFF` is `0x5A` on all three boards
-  - the native Rust decoder in this project successfully treats these as legacy Antminer EEPROM v4 records with algorithm/key byte `0x11`
-  - decoded fields now printed directly by `hashboard_s19jpro eeprom <board>` look plausible on all three boards:
-    - board name: `BHB42603`
-    - factory job: `KPMI20220401001`
-    - board serials: `KPMIYNRBBJDBH1985`, `KPMIYNRBBJDBI0792`, `KPMIYNRBBJDAE0701`
-    - chip markings: `P1CH22AH42`, `J1CV22AH16`, `J1C022AD1C`
-    - chip bins: `1`, `2`, `3`
-    - frequency: `525 MHz`
-    - voltage: `13.60-13.80 V`
-    - nonce rate: `9989-9998`
-    - PCB temperatures: `25-28 °C`
-    - PT1 CRC matches on all three boards
-    - PT2 CRC matches when calculated over the decoded PT2 region bytes
-
-Example:
-
-- `/home/root/hashboard_s19jpro check`
-- `/home/root/hashboard_s19jpro check 0`
-- `/home/root/hashboard_s19jpro temps 0`
-- `/home/root/hashboard_s19jpro temps 1`
-- `/home/root/hashboard_s19jpro temps 2`
-- `/home/root/hashboard_s19jpro eeprom 0`
-- `/home/root/hashboard_s19jpro eeprom 1`
-- `/home/root/hashboard_s19jpro eeprom 2`
-
-Example summary output:
-
-- `response_count=126`
-- `unique_reply_count=1`
-- `unique_reply 01: count=126 data=AA 55 13 62 03 00 00 00 00 00 1E`
-
-Example temperature output:
-
-- `temp0: address=0x4C raw=27 00 temp_c=39.0000`
-- `temp1: address=0x48 raw=21 60 temp_c=33.3750`
-
-Example EEPROM output:
-
-- `board_info_version=0x04 (V4)`
-- `algorithm_and_key_version=0x11 (algorithm=XXTEA key_index=1)`
-- `board_serial=KPMIYNRBBJDBH1985`
-- `board_name=BHB42603`
-- `factory_job=KPMI20220401001`
-- `chip_marking=P1CH22AH42`
-- `voltage_v=13.80`
-- `frequency_mhz=525`
-- `nonce_rate=9989`
-- `pt1_crc=stored:0x1C calculated:0x1C match:true`
-- `pt2_crc=stored:0x15 tool_calc:0x12 region_calc:0x15`
+- `./hashboard_s19jpro check`
+- `./hashboard_s19jpro check 1`
+- `./hashboard_s19jpro temps 2`
+- `./hashboard_s19jpro eeprom 0`
 
 ## Build
 
@@ -276,19 +250,14 @@ Example copy target:
 - `/home/root/fan-tool`
 - `/home/root/hashboard_s19jpro`
 
-## Safety notes
 
-- Disable the watchdog before longer experiments.
-- Avoid `WRITE_CAL` until the calibration map is fully understood.
-- Voltage changes should be followed by a short settling delay before measurement.
-- Fan speed changes should also be followed by a short settling delay before reading RPM.
-- `fan-tool` currently assumes 2 tach pulses per revolution and two shared PWM channels for four fans.
 
 ## Credits
 
 - [Mujina](https://github.com/256foundation/mujina/) for being the best
 - zbomzz for PSU protocol reverse engineering
 - [Hashsource](https://github.com/HashSource/Antminer-APW12-Firmware) for PSU firmware dumps
+- [Hashsource](https://github.com/HashSource/Amlogic_Guides) for rare Amlogic documentation
 - [Alex20129](https://github.com/Alex20129/eeprom_tool) for EEPROM decoding
 
 ## License
