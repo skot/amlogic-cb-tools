@@ -73,7 +73,7 @@ fn check_hashboard(board: HashboardConfig) -> Result<(), Box<dyn std::error::Err
     println!("detect_gpio={}", board.detect_gpio);
 
     let detect = SysfsGpio::new(board.detect_gpio);
-    detect.set_input()?;
+    detect.set_input_bias_disabled()?;
     let present = detect.read_value()?;
     println!("presence_detect={} ({})", present, if present == 0 { "not-present-or-low" } else { "present-or-high" });
 
@@ -132,7 +132,7 @@ fn read_hashboard_temps(board: HashboardConfig) -> Result<(), Box<dyn std::error
     println!("detect_gpio={}", board.detect_gpio);
 
     let detect = SysfsGpio::new(board.detect_gpio);
-    detect.set_input()?;
+    detect.set_input_bias_disabled()?;
     let present = detect.read_value()?;
     println!("presence_detect={} ({})", present, if present == 0 { "not-present-or-low" } else { "present-or-high" });
     if present == 0 {
@@ -164,7 +164,7 @@ fn read_hashboard_eeprom(board: HashboardConfig) -> Result<(), Box<dyn std::erro
     println!("detect_gpio={}", board.detect_gpio);
 
     let detect = SysfsGpio::new(board.detect_gpio);
-    detect.set_input()?;
+    detect.set_input_bias_disabled()?;
     let present = detect.read_value()?;
     println!("presence_detect={} ({})", present, if present == 0 { "not-present-or-low" } else { "present-or-high" });
     if present == 0 {
