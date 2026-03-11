@@ -82,33 +82,33 @@ control board.
 
 ### Hashboard serial links
 
-- HB0 UART: `/dev/ttyS1` on `GPIOX_8`/`GPIOX_9` (`466`/`467`, `uart_a` TX/RX)
+- HB0 UART: `/dev/ttyS3` on `GPIOAO_4`/`GPIOAO_5` (`501`/`502`, `uart_ao_b` TX/RX)
 - HB1 UART: `/dev/ttyS2` on `GPIOZ_2`/`GPIOZ_3` (`413`/`414`, `uart_b` TX/RX)
-- HB2 UART: `/dev/ttyS3` on `GPIOAO_4`/`GPIOAO_5` (`501`/`502`, `uart_ao_b` TX/RX)
+- HB2 UART: `/dev/ttyS1` on `GPIOX_8`/`GPIOX_9` (`466`/`467`, `uart_a` TX/RX)
 
 ### Hashboard control GPIO
 
 - reset GPIOs:
-  - HB0: `456` (`GPIOA_19`)
+  - HB0: `454` (`GPIOA_17`)
   - HB1: `455` (`GPIOA_18`)
-  - HB2: `454` (`GPIOA_17`)
+  - HB2: `456` (`GPIOA_19`)
 - detect GPIOs:
-  - HB0: `441` (`GPIOA_4`)
+  - HB0: `439` (`GPIOA_2`)
   - HB1: `440` (`GPIOA_3`)
-  - HB2: `439` (`GPIOA_2`)
+  - HB2: `441` (`GPIOA_4`)
 
 ### Hashboard sensor and EEPROM bus
 
 - native Linux I2C bus: `/dev/i2c-0`
 - bus pins: `GPIOAO_10`/`GPIOAO_11` (`507`/`508`, `i2c_ao` SCL/SDA)
 - TMP75 temperature sensor addresses:
-  - HB0: `0x4E`, `0x4A`
+  - HB0: `0x48`, `0x4C`
   - HB1: `0x4D`, `0x49`
-  - HB2: `0x48`, `0x4C`
+  - HB2: `0x4E`, `0x4A`
 - EEPROM addresses:
-  - HB0: `0x52`
+  - HB0: `0x50`
   - HB1: `0x51`
-  - HB2: `0x50`
+  - HB2: `0x52`
 
 
 ## Current apw12-psu-tool scope
