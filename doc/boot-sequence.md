@@ -37,22 +37,22 @@ This distinction matters.
 
 ```mermaid
 flowchart TD
-    A[Boot ROM / BL1] --> B[BL2 from NAND FIP]
-    B --> C[BL30 platform firmware]
-    B --> D[BL31 secure monitor / ATF]
-    D --> E[U-Boot BL33]
-    E --> F[Read NAND env and DTB selector]
-    F --> G[Attach UBI on nvdata]
-    G --> H[Load Image and axg_s400_antminer.dtb from UBIFS]
-    H --> I[Linux kernel 4.9.241]
-    I --> J[Mount ubi0:nvdada_log as root]
-    J --> K[/sbin/init -> init.sysvinit]
-    K --> L[/etc/init.d/rcS]
-    L --> M[Runlevel 5]
-    M --> N[S00amlogic_boot_script.sh]
-    M --> O[networking, dropbear, httpd, syslog]
-    M --> P[S90luxminer-init]
-    P --> Q[luxupdate supervises luxminer]
+  A["Boot ROM / BL1"] --> B["BL2 from NAND FIP"]
+  B --> C["BL30 platform firmware"]
+  B --> D["BL31 secure monitor / ATF"]
+  D --> E["U-Boot BL33"]
+  E --> F["Read NAND env and DTB selector"]
+  F --> G["Attach UBI on nvdata"]
+  G --> H["Load Image and axg_s400_antminer.dtb from UBIFS"]
+  H --> I["Linux kernel 4.9.241"]
+  I --> J["Mount ubi0:nvdada_log as root"]
+  J --> K["PID 1: /sbin/init (init.sysvinit)"]
+  K --> L["Run /etc/init.d/rcS"]
+  L --> M["Enter runlevel 5"]
+  M --> N["Run S00amlogic_boot_script.sh"]
+  M --> O["Start networking, dropbear, httpd, syslog"]
+  M --> P["Run S90luxminer-init"]
+  P --> Q["luxupdate supervises luxminer"]
 ```
 
 ## Stage 1: SoC ROM and trusted firmware
