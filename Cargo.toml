@@ -6,5 +6,8 @@ description = "Standalone Amlogic control-board utilities, including APW12 PSU c
 license = "MIT"
 
 [dependencies]
+embedded-graphics = "0.8"
 hex = "0.4"
 libc = "0.2"
+linux-embedded-hal = "0.3.2"
+ssd1306 = "0.8"

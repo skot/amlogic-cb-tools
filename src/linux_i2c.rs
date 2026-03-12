@@ -7,6 +7,7 @@ const I2C_SLAVE: libc::c_ulong = 0x0703;
 const I2C_SMBUS: libc::c_ulong = 0x0720;
 const I2C_SMBUS_WRITE: u8 = 0;
 const I2C_SMBUS_READ: u8 = 1;
+const I2C_SMBUS_QUICK: u32 = 0;
 const I2C_SMBUS_BYTE: u32 = 1;
 const I2C_SMBUS_BYTE_DATA: u32 = 2;
 const I2C_SMBUS_WORD_DATA: u32 = 3;
@@ -65,6 +66,22 @@ impl LinuxI2cDevice {
             command: register,
             size: I2C_SMBUS_BYTE_DATA,
             data: &mut data,
+        };
+
+        let rc = unsafe { libc::ioctl(self.file.as_raw_fd(), I2C_SMBUS as _, &mut args) };
+        if rc < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        Ok(())
+    }
+
+    pub fn quick_write(&mut self) -> Result<(), std::io::Error> {
+        let mut args = I2cSmbusIoctlData {
+            read_write: I2C_SMBUS_WRITE,
+            command: 0,
+            size: I2C_SMBUS_QUICK,
+            data: std::ptr::null_mut(),
         };
 
         let rc = unsafe { libc::ioctl(self.file.as_raw_fd(), I2C_SMBUS as _, &mut args) };

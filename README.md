@@ -14,6 +14,7 @@ This project is intentionally separate from [Mujina](https://github.com/256found
 - `controlboard-misc` — misc GPIO helpers for control-board LEDs
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
 - `hashboard_s19jpro` — direct serial and GPIO sanity checks for the three connected S19j Pro hashboards
+- `oled-ssd1306` — simple SSD1306 OLED text output over the confirmed `IIC3` Linux I2C bus
 
 ## LuxOS firmware base
 LuxOS makes a good base firmware for experimentation. When flashed to an Amlogic controlboard you can ssh to the controlboard with user root/root and the whole filesystem is writeable. We're not interested in running LuxOS though, so you can disable the luxminer app as follows;
@@ -80,6 +81,13 @@ control board.
 - green LED GPIO: `453` (`GPIOA_16`)
 - red LED GPIO: `438` (`GPIOA_1`)
 - IP Report Button: `445` (`GPIOA_8`)
+
+### IIC3 test points
+
+- `IIC3_SCL` test point: `GPIOZ_8`
+- `IIC3_SDA` test point: `GPIOZ_9`
+- Linux I2C adapter: `/dev/i2c-2`
+- current OLED experiment target: SSD1306 `128x32` display, typically at `0x3C`
 
 ### Hashboard serial links
 
@@ -186,6 +194,21 @@ Examples:
 - `./hashboard_s19jpro check 1`
 - `./hashboard_s19jpro temps 2`
 - `./hashboard_s19jpro eeprom 0`
+
+## Current oled-ssd1306 scope
+
+- initializes a `128x32` SSD1306 OLED on `/dev/i2c-2`
+- defaults to I2C address `0x3C`
+- uses the `embedded-graphics` text stack with SSD1306 driver support
+- clears the display and renders up to three centered text lines
+- defaults to `Hello world` when no text is provided
+
+Examples:
+
+- `./oled-ssd1306`
+- `./oled-ssd1306 "Hello world"`
+- `./oled-ssd1306 "Hash OK" "Fan 4200"`
+- `./oled-ssd1306 "HB0 OK" "PSU 12.3V" "IP 192.168.1.236"`
 
 ## Build
 
