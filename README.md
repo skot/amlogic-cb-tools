@@ -8,6 +8,9 @@ Tools and notes for using the Amlogic A113D processor as featured on the Bitmain
 
 This project is intentionally separate from [Mujina](https://github.com/256foundation/mujina/). It is meant to host small standalone binaries that can be deployed onto a live control board so hardware behavior can be validated independently before integrating support into Mujina.
 
+For a consolidated explanation of the observed firmware and software stack on
+the board, see [doc/boot-sequence.md](doc/boot-sequence.md).
+
 ## Binaries
 
 - `apw12-psu-tool` — APW12 PSU control and telemetry
