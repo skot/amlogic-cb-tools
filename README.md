@@ -219,6 +219,9 @@ Recommended target:
 
 - `aarch64-unknown-linux-musl`
 
+For normal stock LuxOS systems, these tools should be built as `aarch64`
+binaries.
+
 This repository includes a Cargo target config that uses `rust-lld` for
 `aarch64-unknown-linux-musl`, so the build commands below should work on macOS
 without setting a separate linker environment variable each time.
@@ -240,6 +243,29 @@ The resulting binaries on the local build machine will appear under:
 - `target/aarch64-unknown-linux-musl/release/controlboard-misc`
 - `target/aarch64-unknown-linux-musl/release/fan-tool`
 - `target/aarch64-unknown-linux-musl/release/hashboard_s19jpro`
+
+### Note on the experimental USB-kernel branch
+
+During the USB mass-storage / Wi-Fi kernel work, we tested a custom rebuilt
+kernel and userspace combination that did not behave like a stock LuxOS board.
+On that modified setup, the `aarch64` `amlogic-cb-tools` binaries were no
+longer the right fit, and an `armv7-unknown-linux-gnueabihf` build produced
+working binaries instead.
+
+That behavior should be treated as specific to that experimental environment,
+not as the default expectation for ordinary LuxOS systems.
+
+If you are working on that modified USB-kernel setup, the host-side flow on
+macOS that worked for us was:
+
+- install `zig`
+- install `cargo-zigbuild`
+- install the Rust target:
+  - `rustup target add armv7-unknown-linux-gnueabihf`
+
+- `cargo zigbuild --release --target armv7-unknown-linux-gnueabihf`
+
+- `target/armv7-unknown-linux-gnueabihf/release/<binary-name>`
 
 ## Deploy
 
@@ -278,6 +304,11 @@ Example copy target:
 - `/home/root/controlboard-misc`
 - `/home/root/fan-tool`
 - `/home/root/hashboard_s19jpro`
+
+If you prefer to avoid `scp -O`, the live LuxOS board also accepts a simple SSH
+streaming copy:
+
+- `ssh root@<controlboard_ip> "cat > /home/root/controlboard-misc && chmod 755 /home/root/controlboard-misc" < target/aarch64-unknown-linux-musl/release/controlboard-misc`
 
 
 
