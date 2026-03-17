@@ -2,12 +2,12 @@
 
 This directory collects the validated procedure for enabling Linux USB
 host and USB mass storage on the Bitmain Amlogic controlboard used in this
-repository.
+repository, plus the current work-in-progress path for USB Wi-Fi.
 
-The currently validated working combination is:
+The currently validated working combination for USB host and storage is:
 
-- kernel image: `usb/Image-usb-storage`
-- DTB: `usb/axg_s400_antminer.usb-host-nand-clocks.dtb`
+- kernel image: `usb/bin/Image-usb-storage`
+- DTB: `usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb`
 
 With that pair installed on a compatible board, the board:
 
@@ -17,14 +17,45 @@ With that pair installed on a compatible board, the board:
 - exposes `/dev/sda` and `/dev/sda1`
 - passes live USB read/write testing
 
+For USB Wi-Fi, the currently identified dongle is:
+
+- USB ID: `0bda:c811`
+- vendor: `Realtek`
+- product string: `802.11ac NIC`
+- driver family: `RTL8821CU` / `RTL8811CU`
+
+The public Amlogic 4.9 tree in this repository does not contain an in-tree
+driver for that device. The supported path here is an external `rtl8821cu`
+module build.
+
+On the validated storage-only kernel (`usb/bin/Image-usb-storage`), the external
+module currently fails to load on this board with `Unknown symbol
+wireless_send_event`. The supported path for `0bda:c811` is therefore the
+Wi-Fi-capable kernel plus a cfg80211-enabled `8821cu.ko` build.
+
 ## What is in this directory
 
 - `build-usb-storage-kernel.sh`
-  Wrapper for the validated Docker-based kernel build helper.
+  Builds the validated USB-storage kernel image.
+- `build-usb-wifi-kernel.sh`
+  Builds a Wi-Fi-capable kernel image with `cfg80211` and WEXT enabled.
+- `build-rtl8821cu-module.sh`
+  Builds the external `rtl8821cu` module for the `0bda:c811` Realtek dongle.
+- `build-wifi-userspace.sh`
+  Builds armhf `wpa_supplicant`, `wpa_cli`, `wpa_passphrase`, and the required
+  `libnl` runtime libraries for the board.
 - `install-kernel-image.sh`
-  Wrapper for the guarded kernel image installer.
+  Installs a kernel image onto the board.
 - `install-usb-dtb.sh`
-  Wrapper for the guarded DTB installer.
+  Installs the validated DTB onto the board.
+- `install-rtl8821cu.sh`
+  Uploads and loads the external `rtl8821cu` kernel module.
+- `install-wifi-userspace.sh`
+  Uploads `wpa_supplicant`, `wpa_cli`, `wpa_passphrase`, and the matching
+  `libnl` runtime libraries to the board.
+- `connect-wifi.sh`
+  Starts `wpa_supplicant` on the board and requests DHCP on `wlan0` without
+  touching the existing `eth0` DHCP client.
 
 ## Prerequisites
 
@@ -51,18 +82,36 @@ open -a Docker
 
 ## Files and artifacts used by this workflow
 
-Everything needed for the workflow is in `usb/`:
+Everything needed for the workflow is in `usb/`, with generated artifacts under
+`usb/bin/`:
 
 - extracted vendor baseline config:
   `usb/Antminer-4.9.241.config`
 - validated rebuilt kernel:
-  `usb/Image-usb-storage`
+  `usb/bin/Image-usb-storage`
 - kernel checksum:
-  `usb/Image-usb-storage.sha256`
+  `usb/bin/Image-usb-storage.sha256`
 - validated DTB for rebuilt kernel:
-  `usb/axg_s400_antminer.usb-host-nand-clocks.dtb`
+  `usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb`
 - DTB checksum:
-  `usb/axg_s400_antminer.usb-host-nand-clocks.dtb.sha256`
+  `usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb.sha256`
+
+Generated on demand:
+
+- Wi-Fi-capable kernel image:
+  `usb/bin/Image-usb-storage-wifi`
+- external Realtek module:
+  `usb/bin/8821cu.ko`
+- armhf Wi-Fi userspace tools:
+  `usb/bin/wpa_supplicant-armhf`
+  `usb/bin/wpa_cli-armhf`
+  `usb/bin/wpa_passphrase-armhf`
+  `usb/bin/libnl-3.so.200`
+  `usb/bin/libnl-genl-3.so.200`
+
+The validated storage-only kernel remains the right baseline for USB mass
+storage, but it is not sufficient by itself for this external Realtek Wi-Fi
+module on the live board.
 
 Use the NAND-clock DTB with the rebuilt kernel.
 
@@ -88,29 +137,15 @@ What it does:
 Build outputs:
 
 - kernel image:
-  `usb/Image-usb-storage`
+  `usb/bin/Image-usb-storage`
 - kernel checksum:
-  `usb/Image-usb-storage.sha256`
+  `usb/bin/Image-usb-storage.sha256`
 - final config:
-  `usb/.config.final`
-- logs:
-  `usb/olddefconfig.log`
-  `usb/build.log`
+  `usb/bin/.config.final`
+### Supported path on this board
 
-## Step 2: Install the rebuilt kernel on a live board
-
-From the repository root:
-
-```sh
-BOARD_PASSWORD=root REBOOT_AFTER_INSTALL=0 \
-  usb/install-kernel-image.sh <board-ip>
-```
-
-What it does:
-
-- verifies the local image checksum
-- backs up `/Image` to `/Image.pre-usb-storage`
-- uploads the rebuilt image through plain SSH
+The validated storage-only kernel does not export the wireless symbols this
+driver needs, so build and install the Wi-Fi-capable kernel first:
 - verifies the uploaded and installed checksums
 
 By default, this only stages the image if `REBOOT_AFTER_INSTALL=0`.
@@ -127,7 +162,7 @@ BOARD_PASSWORD=root REBOOT_AFTER_INSTALL=1 \
 Current default DTB:
 
 ```text
-usb/axg_s400_antminer.usb-host-nand-clocks.dtb
+usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb
 ```
 
 What it does:
@@ -155,7 +190,7 @@ sha256sum /axg_s400_antminer.dtb
 Expected signs of success:
 
 - kernel reports the rebuilt 4.9.337 image
-- DTB checksum matches `usb/axg_s400_antminer.usb-host-nand-clocks.dtb`
+- DTB checksum matches `usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb`
 
 Check NAND/UBI and USB storage in the log:
 
@@ -256,3 +291,160 @@ For a fresh operator using this repository, the shortest validated path is:
 4. run the verification commands above
 
 That is the working end-to-end procedure currently validated in this repository.
+
+## USB Wi-Fi addendum for Realtek `0bda:c811`
+
+### What this dongle is
+
+The attached adapter identifies as:
+
+- `idVendor=0bda`
+- `idProduct=c811`
+- interface class `ff/ff/ff`
+
+That maps to the Realtek `RTL8821CU` / `RTL8811CU` family. Linux gained
+in-tree support much later than 4.9, so this repository uses the external
+`brektrou/rtl8821CU` driver for this board.
+
+### Supported path on this board
+
+The validated storage-only kernel does not export the wireless symbols this
+driver needs, so use the Wi-Fi-capable kernel path:
+
+If you want a kernel image with built-in wireless core support for follow-on
+userspace work:
+
+```sh
+usb/build-usb-wifi-kernel.sh
+BOARD_PASSWORD=root REBOOT_AFTER_INSTALL=0 \
+  usb/install-kernel-image.sh <board-ip> usb/bin/Image-usb-storage-wifi
+BOARD_PASSWORD=root REBOOT_AFTER_INSTALL=1 \
+  usb/install-usb-dtb.sh <board-ip>
+```
+
+Then rebuild the module with cfg80211 support left enabled:
+
+```sh
+usb/build-rtl8821cu-module.sh
+BOARD_PASSWORD=root usb/install-rtl8821cu.sh <board-ip>
+```
+
+After the board exposes `wlan0`, build and install Wi-Fi userspace:
+
+```sh
+usb/build-wifi-userspace.sh
+BOARD_PASSWORD=root usb/install-wifi-userspace.sh <board-ip>
+```
+
+Then join a WPA/WPA2-PSK network and request DHCP:
+
+```sh
+BOARD_PASSWORD=root \
+WIFI_SSID='your-ssid' \
+WIFI_PSK='your-passphrase' \
+usb/connect-wifi.sh <board-ip>
+```
+
+By default that host-side helper writes `/config/wpa_supplicant-wlan0.conf`,
+sets it to mode `0600`, starts `/usr/local/bin/wpa_supplicant -D nl80211,wext`,
+and runs BusyBox `udhcpc` on `wlan0` using interface-specific PID files so it
+does not kill the board's existing `udhcpc` process for `eth0`.
+
+When `eth0` and `wlan0` are both on the same IPv4 subnet, the helper also
+installs a source-based policy route for the Wi-Fi address so replies sourced
+from `wlan0` do not get sent back out `eth0`.
+
+If you prefer to keep credentials only on the board, create the config file
+there once and then run `usb/connect-wifi.sh` without `WIFI_SSID` or
+`WIFI_PSK`:
+
+```sh
+ssh root@<board-ip>
+export PATH=/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+export LD_LIBRARY_PATH=/lib
+
+IFACE=wlan0
+CONF=/config/wpa_supplicant-$IFACE.conf
+
+umask 077
+cat > "$CONF" <<'EOF'
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+network={
+  ssid="your-ssid"
+  psk="your-passphrase"
+  key_mgmt=WPA-PSK
+}
+EOF
+chmod 600 "$CONF"
+```
+
+Then connect using the existing on-device config:
+
+```sh
+BOARD_PASSWORD=root usb/connect-wifi.sh <board-ip>
+```
+
+You can also point the helper at a different on-device file:
+
+```sh
+BOARD_PASSWORD=root \
+WIFI_CONFIG_PATH=/etc/wpa_supplicant/wpa_supplicant.conf \
+usb/connect-wifi.sh <board-ip>
+```
+
+### Automatic Wi-Fi At Boot
+
+If you want the board to bring Wi-Fi up automatically at boot using the
+existing `/config/wpa_supplicant-wlan0.conf`, install the autostart service:
+
+```sh
+BOARD_PASSWORD=root usb/install-wifi-autostart.sh <board-ip>
+```
+
+That installs `/etc/init.d/wifi-autostart` and enables it in runlevels
+`2/3/4/5`. The installer also patches the LuxOS `networking` init script so
+boot does not spend about a minute waiting for `eth0` DHCP when Ethernet has no
+carrier and Wi-Fi autostart is configured. On boot it will:
+
+- load `8821cu`
+- start `wpa_supplicant` on `wlan0`
+- run `udhcpc` on `wlan0`
+- apply the source-based Wi-Fi routing policy
+- remove the stale IPv4 from `eth0` when Ethernet has no carrier, so the old
+  Ethernet address does not remain reachable over Wi-Fi
+
+If you want to start it immediately after install instead of waiting for the
+next reboot:
+
+```sh
+BOARD_PASSWORD=root START_AFTER_INSTALL=1 usb/install-wifi-autostart.sh <board-ip>
+```
+
+Optional overrides can be placed in `/config/wifi-autostart.conf`:
+
+```sh
+cat > /config/wifi-autostart.conf <<'EOF'
+WIFI_IFACE=wlan0
+WIFI_CONFIG_PATH=/config/wpa_supplicant-wlan0.conf
+WIFI_ROUTE_TABLE=101
+ETH_IFACE=eth0
+EOF
+chmod 600 /config/wifi-autostart.conf
+```
+
+### Notes
+
+- The driver source includes USB IDs for both `0bda:c811` and `0bda:c82b`.
+- The driver embeds its own firmware image, so no extra firmware blob is
+  required under `/lib/firmware` for this module path.
+- The failed fast-path symptom on the storage-only kernel is:
+  `8821cu: Unknown symbol wireless_send_event`.
+- The board already ships `ifconfig`, `ip`, and `udhcpc`, so the missing
+  userspace piece was WPA itself rather than DHCP or basic interface control.
+- The board does not ship the `libnl` runtime needed for `nl80211`, so the
+  userspace build exports and installs the matching armhf `libnl` shared
+  libraries alongside `wpa_supplicant`.
+- Some `RTL8821CU` adapters need `usb_modeswitch -K -v 0bda -p c811` before the
+  driver binds. This repository does not currently ship `usb_modeswitch`, so
+  only add that step if the module loads but no wireless interface appears.

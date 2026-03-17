@@ -1,0 +1,4 @@
+scripts/kconfig/conf  --olddefconfig Kconfig
+#
+# configuration written to .config
+#

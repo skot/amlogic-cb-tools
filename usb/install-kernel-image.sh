@@ -8,7 +8,7 @@ Usage: usb/install-kernel-image.sh <board-ip> [image-path]
 
 Validated pairing:
 	Install this kernel together with
-	usb/axg_s400_antminer.usb-host-nand-clocks.dtb
+	usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb
 	using usb/install-usb-dtb.sh.
 
 Environment:
@@ -44,13 +44,15 @@ if ! command -v shasum >/dev/null 2>&1; then
 fi
 
 board_ip=$1
-image_path=${2:-usb/Image-usb-storage}
 board_password=${BOARD_PASSWORD:-root}
 remote_image_path=${REMOTE_IMAGE_PATH:-/Image}
 remote_tmp_image_path=${REMOTE_TMP_IMAGE_PATH:-/tmp/Image.usb-storage}
 backup_suffix=.pre-usb-storage
 remote_backup_path="${remote_image_path}${backup_suffix}"
 ssh_opts=(-o StrictHostKeyChecking=no)
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
+artifact_dir="$repo_root/usb/bin"
+image_path=${2:-$artifact_dir/Image-usb-storage}
 
 if [[ ! -f "$image_path" ]]; then
 	echo "Kernel image not found: $image_path" >&2
@@ -110,7 +112,7 @@ fi
 rollback_needed=0
 
 echo "Install complete. Backup saved as ${remote_backup_path}."
-echo "Validated DTB pairing: usb/axg_s400_antminer.usb-host-nand-clocks.dtb"
+echo "Validated DTB pairing: $artifact_dir/axg_s400_antminer.usb-host-nand-clocks.dtb"
 
 if [[ ${REBOOT_AFTER_INSTALL:-0} == "1" ]]; then
 	echo "== reboot =="

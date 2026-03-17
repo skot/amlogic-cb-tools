@@ -7,7 +7,7 @@ usage() {
 Usage: usb/install-usb-dtb.sh <board-ip> [dtb-path]
 
 Default DTB:
-	usb/axg_s400_antminer.usb-host-nand-clocks.dtb
+	usb/bin/axg_s400_antminer.usb-host-nand-clocks.dtb
 	This is the validated companion DTB for the rebuilt USB-storage kernel.
 
 Environment:
@@ -42,13 +42,15 @@ if ! command -v shasum >/dev/null 2>&1; then
 fi
 
 board_ip=$1
-dtb_path=${2:-usb/axg_s400_antminer.usb-host-nand-clocks.dtb}
 board_password=${BOARD_PASSWORD:-root}
 remote_dtb_path=${REMOTE_DTB_PATH:-/axg_s400_antminer.dtb}
 remote_tmp_path=${REMOTE_TMP_PATH:-/tmp/axg_s400_antminer.usb-host-nand-clocks.dtb}
 backup_suffix=.pre-usb-host
 remote_backup_path="${remote_dtb_path}${backup_suffix}"
 ssh_opts=(-o StrictHostKeyChecking=no)
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
+artifact_dir="$repo_root/usb/bin"
+dtb_path=${2:-$artifact_dir/axg_s400_antminer.usb-host-nand-clocks.dtb}
 
 if [[ ! -f "$dtb_path" ]]; then
 	echo "DTB file not found: $dtb_path" >&2
@@ -108,7 +110,7 @@ fi
 rollback_needed=0
 
 echo "Install complete. Backup saved as ${remote_backup_path}."
-echo "Validated rebuilt-kernel pairing: usb/axg_s400_antminer.usb-host-nand-clocks.dtb"
+echo "Validated rebuilt-kernel pairing: $artifact_dir/axg_s400_antminer.usb-host-nand-clocks.dtb"
 
 if [[ ${REBOOT_AFTER_INSTALL:-0} == "1" ]]; then
 	echo "== reboot =="

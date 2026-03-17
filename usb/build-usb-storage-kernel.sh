@@ -13,12 +13,12 @@ as the baseline, then forces these options built-in:
 	CONFIG_USB_STORAGE=y
 	CONFIG_USB_UAS=y
 
-Artifacts are written under usb/:
-	usb/Image-usb-storage
-	usb/Image-usb-storage.sha256
-	usb/.config.final
-	usb/olddefconfig.log
-	usb/build.log
+Artifacts are written under usb/bin/:
+	usb/bin/Image-usb-storage
+	usb/bin/Image-usb-storage.sha256
+	usb/bin/.config.final
+	usb/bin/olddefconfig.log
+	usb/bin/build.log
 EOF
 }
 
@@ -34,6 +34,7 @@ fi
 
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 usb_dir="$repo_root/usb"
+artifact_dir="$usb_dir/bin"
 config_path="$usb_dir/Antminer-4.9.241.config"
 docker_volume=amlogic-kernel-4_9-src
 docker_image=ubuntu:22.04
@@ -42,6 +43,8 @@ if [[ ! -f "$config_path" ]]; then
 	echo "Missing config: $config_path" >&2
 	exit 1
 fi
+
+mkdir -p "$artifact_dir"
 
 docker run --rm \
 	-v "$repo_root:/work" \
@@ -91,19 +94,22 @@ for key, value in wanted.items():
 cfg.write_text("\n".join(out) + "\n")
 PY
 
+		mkdir -p /work/usb/bin
+
 		make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig \
-			> /work/usb/olddefconfig.log 2>&1
+			> /work/usb/bin/olddefconfig.log 2>&1
 
 		make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
 			KCFLAGS=-Wno-error Image \
-			> /work/usb/build.log 2>&1
+			> /work/usb/bin/build.log 2>&1
 
-		cp arch/arm64/boot/Image /work/usb/Image-usb-storage
-		cp .config /work/usb/.config.final
-		sha256sum /work/usb/Image-usb-storage > /work/usb/Image-usb-storage.sha256
+		cp arch/arm64/boot/Image /work/usb/bin/Image-usb-storage
+		cp .config /work/usb/bin/.config.final
+		cd /work
+		sha256sum usb/bin/Image-usb-storage > usb/bin/Image-usb-storage.sha256
 	'
 
 echo "Build complete."
-echo "Image: $usb_dir/Image-usb-storage"
-echo "Config: $usb_dir/.config.final"
-echo "Logs: $usb_dir/olddefconfig.log and $usb_dir/build.log"
+echo "Image: $artifact_dir/Image-usb-storage"
+echo "Config: $artifact_dir/.config.final"
+echo "Logs: $artifact_dir/olddefconfig.log and $artifact_dir/build.log"
