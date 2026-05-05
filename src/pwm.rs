@@ -33,7 +33,24 @@ impl SysfsPwm {
         let duty_ns = (u64::from(period_ns) * u64::from(percent) / 100) as u32;
         self.ensure_exported()?;
         self.disable()?;
-        fs::write(self.pwm_root.join("period"), period_ns.to_string())?;
+        // Period <-> duty ordering is constrained by the pwm-meson driver:
+        // - if new period < current duty, write duty=0 first (else EINVAL)
+        // - if current period == 0, write period before duty (writing duty=0
+        //   when period=0 also EINVALs, since duty must be <= period)
+        let cur_period: u32 = fs::read_to_string(self.pwm_root.join("period"))
+            .ok()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
+        let cur_duty: u32 = fs::read_to_string(self.pwm_root.join("duty_cycle"))
+            .ok()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
+        if cur_duty > period_ns {
+            fs::write(self.pwm_root.join("duty_cycle"), "0")?;
+        }
+        if cur_period != period_ns {
+            fs::write(self.pwm_root.join("period"), period_ns.to_string())?;
+        }
         fs::write(self.pwm_root.join("duty_cycle"), duty_ns.to_string())?;
         fs::write(self.pwm_root.join("polarity"), "normal")?;
         if enable {

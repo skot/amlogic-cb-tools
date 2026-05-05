@@ -18,6 +18,7 @@ the board, see [doc/boot-sequence.md](doc/boot-sequence.md).
 - `fan-tool` — fan PWM and tachometer experiments for the Amlogic control board
 - `hashboard_s19jpro` — direct serial and GPIO sanity checks for the three connected S19j Pro hashboards
 - `oled-ssd1306` — simple SSD1306 OLED text output over the confirmed `IIC3` Linux I2C bus
+- `pic-tool` — on-hashboard PIC microcontroller (PIC16F1704) handshake and DC-DC gating, required for PIC-variant hashboards (BHB42601, S19j Pro family) to power the BM1362 chips
 
 ## LuxOS firmware base
 LuxOS makes a good base firmware for experimentation. When flashed to an Amlogic controlboard you can ssh to the controlboard with user root/root and the whole filesystem is writeable. We're not interested in running LuxOS though, so you can disable the luxminer app as follows;
@@ -212,6 +213,52 @@ Examples:
 - `./oled-ssd1306 "Hello world"`
 - `./oled-ssd1306 "Hash OK" "Fan 4200"`
 - `./oled-ssd1306 "HB0 OK" "PSU 12.3V" "IP 192.168.1.236"`
+
+## Current pic-tool scope
+
+- talks to the on-hashboard PIC microcontroller (PIC16F1704) over `/dev/i2c-0`
+- per-slot address mapping: HB0=`0x20`, HB1=`0x21`, HB2=`0x22`
+- frame format `0x55 0xAA <length> <opcode> <payload...> <crc>` where
+  `length = bytes-from-length-onwards` and `crc = (length+opcode+sum(payload))&0xFF`
+- responses are streamed back **one byte at a time** with ~30 ms gaps;
+  block reads return bus-floating garbage on this hardware
+- the PIC requires PSU output to be **ON** to respond (its onboard LDO is
+  fed from the 12 V rail)
+- supports these commands:
+  - `pic-tool --address <addr> version`
+  - `pic-tool --address <addr> heartbeat`
+  - `pic-tool --address <addr> read-reg <reg>` (e.g. `0x48..0x4b` for temps)
+  - `pic-tool --address <addr> --confirm-state-change reset`
+  - `pic-tool --address <addr> --confirm-state-change start-app`
+  - `pic-tool --address <addr> --confirm-state-change handshake`
+    (reset + start-app + version + disable-dc-dc; chain stays unpowered)
+  - `pic-tool --address <addr> --confirm-state-change enable-dc-dc`
+    (closes per-domain regulators; chips power up — only after PSU is up
+    at the hashboard's spec voltage and cooling is in place)
+  - `pic-tool --address <addr> --confirm-state-change disable-dc-dc`
+
+Typical bring-up on a PIC-variant board (e.g. BHB42601):
+
+1. `apw12-psu-tool prepare-board`
+2. `apw12-psu-tool set-voltage 13.20`
+3. `apw12-psu-tool output-on`
+4. `pic-tool --address 0x20 --confirm-state-change handshake`
+5. `pic-tool --address 0x20 --confirm-state-change enable-dc-dc`
+6. `hashboard_s19jpro check 0` — should now find 126/126 BM1362 chips
+7. on shutdown: `disable-dc-dc`, then `apw12-psu-tool output-off`
+
+Opcodes confirmed against LuxOS via i2c ftrace:
+| opcode | name | payload | response prefix |
+|---|---|---|---|
+| 0x06 | start_app | `[0x00]` | `[0x06, 0x01]` |
+| 0x07 | reset | `[0x00]` | `[0x07, 0x01]` |
+| 0x15 | set_dc_dc | `[enable, 0x00]` | `[0x15, 0x01]` |
+| 0x16 | heartbeat | `[0x00]` | `[??, 0x16, 0x01, ...]` |
+| 0x17 | get_sw_ver | `[0x00]` | `[0x05, 0x17, version, ...]` |
+| 0x3c | read_reg | `[reg, 0x02, 0x00]` | `[??, 0x3c, 0x01, lo, hi, ...]` |
+
+The `pic` library module (`use amlogic_cb_tools::pic::PicChain`) exposes
+the same protocol for embedding in larger firmware.
 
 ## Build
 
