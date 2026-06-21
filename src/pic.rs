@@ -269,4 +269,20 @@ impl PicChain {
         self.disable_dc_dc()?;
         Ok(version)
     }
+
+    /// Read the four PIC-mediated temperature sensors at registers
+    /// 0x48..0x4b. Each is a 16-bit value; byte 0 (low) is the integer
+    /// degrees Celsius (matches what LuxOS reports in its API).
+    /// Returns the four temperatures in register order.
+    pub fn read_temperatures_celsius(&mut self) -> Result<[f32; 4], PicError> {
+        let mut out = [0f32; 4];
+        for (slot, reg) in (0x48u8..=0x4bu8).enumerate() {
+            let raw = self.read_reg(reg)?;
+            // Byte 0 (low) = integer °C. The high byte contains
+            // sensor-calibration / fractional bits that vary per sensor;
+            // we don't decode those for now.
+            out[slot] = (raw & 0xFF) as f32;
+        }
+        Ok(out)
+    }
 }
