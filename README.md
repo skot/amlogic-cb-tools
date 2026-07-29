@@ -243,6 +243,31 @@ The resulting binaries on the local build machine will appear under:
 
 ## Deploy
 
+### Automated stock-firmware install
+
+Use `amlogic-cb-tools-installer.sh` to bootstrap the stock `miner` account,
+build the binaries for the board's detected architecture, install them in
+`/usr/bin`, and verify their checksums:
+
+- `./amlogic-cb-tools-installer.sh <controlboard_ip>`
+
+The stock SSH defaults are `miner` / `miner`. They can be overridden with
+`--user`, `--password`, or the `BOARD_USER` and `BOARD_PASSWORD` environment
+variables. Use `--skip-bootstrap` when passwordless sudo is already configured,
+or `--skip-build` to deploy existing target artifacts.
+
+The installer does not stop or replace vendor mining services. Stop any
+software that may contend for the PSU, fan, GPIO, I2C, or serial hardware
+before hardware testing.
+
+The tools require elevated access to the board hardware. For example:
+
+- `sudo controlboard-misc status`
+- `sudo fan-tool get-pwm`
+- `sudo hashboard_s19jpro check`
+
+### Manual deployment
+
 The Amlogic control board OS exposes SSH, but it does not provide an SFTP
 server. That means modern `scp` defaults may fail unless legacy SCP protocol is
 forced explicitly.
