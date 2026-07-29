@@ -246,25 +246,63 @@ The resulting binaries on the local build machine will appear under:
 ### Automated stock-firmware install
 
 Use `amlogic-cb-tools-installer.sh` to bootstrap the stock `miner` account,
-build the binaries for the board's detected architecture, install them in
-`/usr/bin`, and verify their checksums:
+install the checked-in prebuilt binaries in `/usr/bin`, and verify their
+checksums:
 
 - `./amlogic-cb-tools-installer.sh <controlboard_ip>`
 
 The stock SSH defaults are `miner` / `miner`. They can be overridden with
 `--user`, `--password`, or the `BOARD_USER` and `BOARD_PASSWORD` environment
 variables. Use `--skip-bootstrap` when passwordless sudo is already configured,
-or `--skip-build` to deploy existing target artifacts.
+or `--build-local` to compile from source instead of using the checked-in
+prebuilt binaries.
 
-The installer does not stop or replace vendor mining services. Stop any
-software that may contend for the PSU, fan, GPIO, I2C, or serial hardware
-before hardware testing.
+The bundled prebuilts target stock AArch64 firmware. The experimental ARMv7
+setup can still be installed with `--build-local` when `zig` and
+`cargo-zigbuild` are available.
+
+By default, the installer stops the stock `cgminer`, `bmminer`, and
+`bitmain_logrotate` processes and disables both mining startup entries:
+
+- `/etc/init.d/S70cgminer`
+- `/etc/init.d/S71monitorcg`
+
+The original init scripts are preserved under
+`/etc/amlogic-cb-tools/stock-init/`. Use `--keep-stock-miner` to install the
+tools without stopping or disabling the stock miner.
+
+To restore stock mining startup:
+
+- `sudo cp -p /etc/amlogic-cb-tools/stock-init/S70cgminer /etc/init.d/S70cgminer`
+- `sudo cp -p /etc/amlogic-cb-tools/stock-init/S71monitorcg /etc/init.d/S71monitorcg`
+- `sudo /etc/init.d/S70cgminer start`
+- `sudo /etc/init.d/S71monitorcg start`
 
 The tools require elevated access to the board hardware. For example:
 
 - `sudo controlboard-misc status`
 - `sudo fan-tool get-pwm`
 - `sudo hashboard_s19jpro check`
+
+### Refreshing prebuilt binaries and publishing a release
+
+Run the refresh helper after changing the Rust sources:
+
+- `./scripts/refresh-prebuilt.sh`
+
+It performs a clean AArch64 release build, copies the current binaries into
+`prebuilt/aarch64-unknown-linux-musl/`, and regenerates their `SHA256SUMS`
+manifest.
+
+GitHub releases are created from the checked-in prebuilts when a version tag is
+pushed:
+
+- `git tag v0.1.0`
+- `git push origin v0.1.0`
+
+The release workflow verifies the checked-in checksums, creates a versioned
+archive, and attaches the archive and its checksum manifest to the release.
+The installer itself does not download release assets.
 
 ### Manual deployment
 

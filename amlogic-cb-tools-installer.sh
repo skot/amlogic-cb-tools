@@ -8,8 +8,10 @@ BOARD_PORT="${BOARD_PORT:-22}"
 BOARD_USER="${BOARD_USER:-miner}"
 BOARD_PASSWORD="${BOARD_PASSWORD:-miner}"
 SKIP_BOOTSTRAP=0
-SKIP_BUILD=0
+BUILD_LOCAL=0
+STOP_STOCK_MINER=1
 REMOTE_STAGE="/tmp/amlogic-cb-tools-installer"
+STOCK_MINER_STUB="${SCRIPT_DIR}/install/stock-mining-disabled.init"
 
 BINARIES=(
 	apw12-psu-tool
@@ -26,15 +28,16 @@ usage() {
 Usage:
   ./amlogic-cb-tools-installer.sh <board-ip> [options]
 
-Bootstraps passwordless sudo on a stock Amlogic control board, builds the
-tools for the board's architecture, and installs them in /usr/bin.
+Bootstraps passwordless sudo on a stock Amlogic control board and installs
+the checked-in prebuilt tools in /usr/bin.
 
 Options:
   --port PORT          SSH port (default: 22)
   --user USERNAME      Stock firmware SSH user (default: miner)
   --password PASSWORD  Stock firmware SSH password (default: miner)
   --skip-bootstrap     Require passwordless sudo to already be configured
-  --skip-build         Install existing target artifacts without rebuilding
+  --build-local        Build from source instead of using prebuilt binaries
+  --keep-stock-miner   Do not stop or disable the stock mining processes
   --help               Show this message
 
 Environment:
@@ -46,6 +49,8 @@ Examples:
   ./amlogic-cb-tools-installer.sh 192.168.1.236
   BOARD_PASSWORD=miner ./amlogic-cb-tools-installer.sh 192.168.1.236
   ./amlogic-cb-tools-installer.sh 192.168.1.236 --skip-bootstrap
+  ./amlogic-cb-tools-installer.sh 192.168.1.236 --build-local
+  ./amlogic-cb-tools-installer.sh 192.168.1.236 --keep-stock-miner
 
 The installed tools access GPIO, I2C, PWM, serial, or /dev/mem. Run hardware
 commands through sudo, for example:
@@ -103,8 +108,16 @@ while [[ $# -gt 0 ]]; do
 			SKIP_BOOTSTRAP=1
 			shift
 			;;
+		--build-local)
+			BUILD_LOCAL=1
+			shift
+			;;
+		--keep-stock-miner)
+			STOP_STOCK_MINER=0
+			shift
+			;;
 		--skip-build)
-			SKIP_BUILD=1
+			echo "Warning: --skip-build is deprecated; prebuilt binaries are now the default." >&2
 			shift
 			;;
 		--help|-h)
@@ -126,6 +139,11 @@ need_cmd ssh
 need_cmd sshpass
 need_cmd shasum
 need_cmd tar
+
+if [[ "${STOP_STOCK_MINER}" == "1" ]]; then
+	[[ -f "${STOCK_MINER_STUB}" ]] ||
+		die "Missing stock-miner init stub: ${STOCK_MINER_STUB}"
+fi
 
 SSH_TARGET="${BOARD_USER}@${BOARD_HOST}"
 SSH_BASE=(
@@ -210,7 +228,7 @@ remote_run '
 	done
 '
 
-if [[ "${SKIP_BUILD}" != "1" ]]; then
+if [[ "${BUILD_LOCAL}" == "1" ]]; then
 	echo "== build =="
 	need_cmd cargo
 	need_cmd rustup
@@ -225,11 +243,20 @@ if [[ "${SKIP_BUILD}" != "1" ]]; then
 		cd "${SCRIPT_DIR}"
 		"${BUILD_COMMAND[@]}"
 	)
+	ARTIFACT_DIR="${SCRIPT_DIR}/target/${RUST_TARGET}/release"
 else
-	echo "== build skipped =="
+	echo "== checked-in prebuilt binaries =="
+	ARTIFACT_DIR="${SCRIPT_DIR}/prebuilt/${RUST_TARGET}"
+	[[ -d "${ARTIFACT_DIR}" ]] ||
+		die "No checked-in prebuilts for ${RUST_TARGET}; rerun with --build-local"
+	[[ -f "${ARTIFACT_DIR}/SHA256SUMS" ]] ||
+		die "Missing prebuilt checksum manifest: ${ARTIFACT_DIR}/SHA256SUMS"
+	(
+		cd "${ARTIFACT_DIR}"
+		shasum -a 256 -c SHA256SUMS
+	) || die "Checked-in prebuilt checksum verification failed"
 fi
 
-ARTIFACT_DIR="${SCRIPT_DIR}/target/${RUST_TARGET}/release"
 for binary in "${BINARIES[@]}"; do
 	[[ -f "${ARTIFACT_DIR}/${binary}" ]] ||
 		die "Missing build artifact: ${ARTIFACT_DIR}/${binary}"
@@ -251,9 +278,65 @@ tar -C "${ARTIFACT_DIR}" -cf - "${BINARIES[@]}" |
 printf '%s' "${CHECKSUM_MANIFEST}" |
 	SSHPASS="${BOARD_PASSWORD}" "${SSH_BASE[@]}" \
 		"cat > '${REMOTE_STAGE}/SHA256SUMS'"
+if [[ "${STOP_STOCK_MINER}" == "1" ]]; then
+	SSHPASS="${BOARD_PASSWORD}" "${SSH_BASE[@]}" \
+		"cat > '${REMOTE_STAGE}/stock-mining-disabled.init'" \
+		<"${STOCK_MINER_STUB}"
+	STUB_CHECKSUM="$(shasum -a 256 "${STOCK_MINER_STUB}" | awk '{print $1}')"
+	remote_run "
+		test \"\$(sha256sum '${REMOTE_STAGE}/stock-mining-disabled.init' | cut -d' ' -f1)\" = '${STUB_CHECKSUM}'
+	"
+fi
 
 echo "== verify upload =="
 remote_run "cd '${REMOTE_STAGE}' && sha256sum -c SHA256SUMS"
+
+if [[ "${STOP_STOCK_MINER}" == "1" ]]; then
+	echo "== stop and disable stock mining processes =="
+	remote_run "
+		set -eu
+		backup_dir=/etc/amlogic-cb-tools/stock-init
+		miner_init=/etc/init.d/S70cgminer
+		monitor_init=/etc/init.d/S71monitorcg
+		stub='${REMOTE_STAGE}/stock-mining-disabled.init'
+
+		test -f \"\${miner_init}\"
+		test -f \"\${monitor_init}\"
+		sudo -n mkdir -p \"\${backup_dir}\"
+
+		if test ! -f \"\${backup_dir}/S70cgminer\"; then
+			sudo -n cp -p \"\${miner_init}\" \"\${backup_dir}/S70cgminer\"
+		fi
+		if test ! -f \"\${backup_dir}/S71monitorcg\"; then
+			sudo -n cp -p \"\${monitor_init}\" \"\${backup_dir}/S71monitorcg\"
+		fi
+
+		sudo -n killall -TERM S71monitorcg 2>/dev/null || true
+		sleep 1
+		sudo -n \"\${backup_dir}/S70cgminer\" stop || true
+		sudo -n killall -TERM cgminer bmminer bitmain_logrotate 2>/dev/null || true
+		sleep 2
+		sudo -n killall -KILL S71monitorcg cgminer bmminer bitmain_logrotate 2>/dev/null || true
+
+		for init_script in \"\${miner_init}\" \"\${monitor_init}\"; do
+			replacement=\"\${init_script}.amlogic-cb-tools-installer\"
+			sudo -n cp \"\${stub}\" \"\${replacement}\"
+			sudo -n chown root:root \"\${replacement}\"
+			sudo -n chmod 0755 \"\${replacement}\"
+			sudo -n mv -f \"\${replacement}\" \"\${init_script}\"
+		done
+
+		for process in cgminer bmminer S71monitorcg; do
+			if pidof \"\${process}\" >/dev/null 2>&1; then
+				echo \"Stock mining process is still running: \${process}\" >&2
+				exit 1
+			fi
+		done
+		sync
+	"
+else
+	echo "== stock mining processes left unchanged =="
+fi
 
 echo "== install =="
 remote_run "
@@ -290,5 +373,8 @@ trap - EXIT
 echo
 echo "Installation complete on ${BOARD_HOST}."
 echo "Installed ${#BINARIES[@]} tools in /usr/bin."
+if [[ "${STOP_STOCK_MINER}" == "1" ]]; then
+	echo "Stock cgminer/bmminer startup is disabled; original init scripts are backed up."
+fi
 echo "Run hardware commands with sudo, for example:"
 echo "  sudo controlboard-misc status"

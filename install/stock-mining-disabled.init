@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# amlogic-cb-tools: stock mining disabled
+
+case "${1:-start}" in
+	start|restart|force-reload)
+		echo "Stock mining disabled by amlogic-cb-tools-installer"
+		;;
+	stop)
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|force-reload}" >&2
+		exit 1
+		;;
+esac
+
+exit 0
