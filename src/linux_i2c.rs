@@ -157,4 +157,11 @@ impl LinuxI2cDevice {
     pub fn write(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
         self.file.write_all(data)
     }
+
+    /// Read N bytes from the slave (already configured via `open`).
+    /// Used for protocols where the slave queues a response after a prior
+    /// write — e.g. the Bitmain hashboard PIC microcontroller.
+    pub fn raw_read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        self.file.read(buf)
+    }
 }

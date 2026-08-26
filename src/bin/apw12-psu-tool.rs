@@ -2,9 +2,11 @@ use amlogic_cb_tools::gpio::SysfsGpio;
 use amlogic_cb_tools::linux_i2c::LinuxI2cDevice;
 use amlogic_cb_tools::protocol::{
     self, CMD_GET_FW_VERSION, CMD_GET_HW_VERSION, CMD_GET_VOLTAGE, CMD_MEASURE_VOLTAGE,
-    CMD_READ_CAL, CMD_READ_STATE, CMD_SET_VOLTAGE, CMD_WATCHDOG, DEFAULT_PSU_ADDRESS,
+    CMD_READ_CAL, CMD_READ_STATE, CMD_READ_TEMPERATURE, CMD_SET_VOLTAGE, CMD_WATCHDOG,
+    DEFAULT_PSU_ADDRESS,
     DEFAULT_PSU_WRITE_REGISTER, NAK_BYTE, PREAMBLE_LSB, PREAMBLE_MSB, build_frame,
-    decode_dac_to_voltage, decode_measured_voltage, encode_voltage_to_dac, parse_frame,
+    decode_dac_to_voltage, decode_measured_voltage, decode_temperature_c,
+    encode_voltage_to_dac, parse_frame,
 };
 use std::env;
 use std::path::PathBuf;
@@ -45,6 +47,7 @@ enum Command {
     GetHw,
     GetVoltage,
     MeasureVoltage,
+    ReadTemperature,
     ReadState,
     DisableWatchdog,
     EnableWatchdog(u8),
@@ -167,6 +170,21 @@ fn run_i2c_command(
             println!(
                 "adc_raw=0x{:02X}{:02X} measured_voltage={:.4} V",
                 frame.payload[1], frame.payload[0], volts
+            );
+            println!("raw: {:02X?}", frame.raw);
+        }
+        Command::ReadTemperature => {
+            let frame = exchange(config, dev, CMD_READ_TEMPERATURE, &[])?;
+            if frame.payload.len() < 2 {
+                return Err("missing temperature payload".into());
+            }
+            // 2-byte little-endian raw NTC/ADC code, not degrees.
+            let raw = u16::from(frame.payload[0]) | (u16::from(frame.payload[1]) << 8);
+            println!(
+                "raw=0x{:04X} ({}) temperature={} C",
+                raw,
+                raw,
+                decode_temperature_c(raw)
             );
             println!("raw: {:02X?}", frame.raw);
         }
@@ -421,6 +439,7 @@ fn parse_args(args: Vec<String>) -> Result<(Config, Command), Box<dyn std::error
         Some("get-hw") => Command::GetHw,
         Some("get-voltage") => Command::GetVoltage,
         Some("measure-voltage") => Command::MeasureVoltage,
+        Some("read-temperature") => Command::ReadTemperature,
         Some("read-state") => Command::ReadState,
         Some("disable-watchdog") => Command::DisableWatchdog,
         Some("enable-watchdog") => {
@@ -489,6 +508,7 @@ fn print_help() {
     println!("  get-hw");
     println!("  get-voltage");
     println!("  measure-voltage");
+    println!("  read-temperature");
     println!("  read-state");
     println!("  disable-watchdog");
     println!("  enable-watchdog [value]");
